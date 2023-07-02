@@ -214,3 +214,29 @@ In the above example, we first sort the documents in descending order based on t
 Then, we group the documents by the key ("_id.key"), and for each group, we retrieve the first (latest) version 
 and the corresponding document. 
 The result will include the latest version of each record for each key.
+
+If you want to keep the value of the document object in the results without the label "document", 
+you can modify the query as follows:
+
+// Connect to MongoDB server and access the database
+use your_database_name
+
+// Access the collection
+db.your_collection_name
+
+// Query for the latest version of each record and project the document fields directly
+db.your_collection_name.aggregate([
+  // Sort by version in descending order
+  { $sort: { "_id.version": -1 } },
+  
+  // Group by the key and get the first (latest) version for each key
+  { $group: {
+    _id: "$_id.key",
+    latestVersion: { $first: "$_id.version" },
+    document: { $first: "$$ROOT" }
+  }},
+  
+  // Replace the document field with its value
+  { $replaceRoot: { newRoot: "$document" } }
+])
+
