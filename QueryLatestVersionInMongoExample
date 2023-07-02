@@ -1,0 +1,189 @@
+Here's an example of how to store a composite key in MongoDB using Java:
+Replace "your_database_name" and "your_collection_name" with the actual names of your database and collection. 
+Modify the compositeKey document to include the fields that form your composite key. 
+In the example above, the composite key document includes two fields: "field1" and "field2". You can add more fields as needed.
+
+Note that when using a composite key, you need to ensure uniqueness of the key values to avoid conflicts.
+
+import com.mongodb.MongoClient;
+import com.mongodb.client.MongoCollection;
+import com.mongodb.client.MongoDatabase;
+import org.bson.Document;
+
+public class StoreCompositeKeyExample {
+    public static void main(String[] args) {
+        // Connect to MongoDB server
+        MongoClient mongoClient = new MongoClient("localhost", 27017);
+
+        // Access the database
+        MongoDatabase database = mongoClient.getDatabase("your_database_name");
+
+        // Access the collection
+        MongoCollection<Document> collection = database.getCollection("your_collection_name");
+
+        // Create a composite key document
+        Document compositeKey = new Document();
+        compositeKey.append("field1", "value1"); // Add fields that form the composite key
+        compositeKey.append("field2", "value2");
+        // ... Add more fields as needed
+
+        // Create a document to be stored with the composite key
+        Document document = new Document();
+        document.append("_id", compositeKey); // Set the composite key document as the _id field
+        document.append("field3", "value3"); // Add other fields as needed
+
+        // Insert the document into the collection
+        collection.insertOne(document);
+
+        // Close the connection
+        mongoClient.close();
+    }
+}
+
+
+
+Here's an example of how to query for the latest version of a document using a key in MongoDB using Java:
+Replace "your_database_name" and "your_collection_name" with the actual names of your database and collection. 
+Modify the "key" and "desired_key_value" in the query document to specify the field name and the desired key value for your query. 
+Additionally, adjust the sortCriteria variable according to your document structure, assuming the version field is named "version" 
+and sorting in descending order (-1) to retrieve the latest version.
+
+The query combines the filter query with sorting by version in descending order and limits the result to only 
+retrieve the latest version document. The result variable contains the matched document, which you can then process according to your requirements.
+
+import com.mongodb.MongoClient;
+import com.mongodb.client.FindIterable;
+import com.mongodb.client.MongoCollection;
+import com.mongodb.client.MongoDatabase;
+import com.mongodb.client.model.Sorts;
+import org.bson.Document;
+
+public class QueryLatestVersionExample {
+    public static void main(String[] args) {
+        // Connect to MongoDB server
+        MongoClient mongoClient = new MongoClient("localhost", 27017);
+
+        // Access the database
+        MongoDatabase database = mongoClient.getDatabase("your_database_name");
+
+        // Access the collection
+        MongoCollection<Document> collection = database.getCollection("your_collection_name");
+
+        // Create a filter query using the key value
+        Document query = new Document("key", "desired_key_value");
+
+        // Define the sort criteria to get the latest version
+        Document sortCriteria = new Document("version", -1); // Assuming the version field is named "version"
+
+        // Execute the query with sorting and retrieve the latest version
+        FindIterable<Document> result = collection.find(query).sort(sortCriteria).limit(1);
+
+        // Iterate over the result
+        for (Document document : result) {
+            // Process the document as needed
+            System.out.println(document);
+        }
+
+        // Close the connection
+        mongoClient.close();
+    }
+}
+
+Here's an example of how to query the latest version of each record when multiple records are to be returned using Java:
+Replace "your_database_name" and "your_collection_name" with the actual names of your database and collection. 
+Modify the "$key", "version", and any other field names in the aggregation pipeline to match your document structure.
+
+The aggregation pipeline consists of two stages. First, the documents are sorted in descending order based on the version field. 
+Then, they are grouped by the key field, and for each group, the $first operator is used to retrieve the first (latest) version 
+and the corresponding document. The result contains the latest version documents for each key.
+
+You can process the retrieved documents within the loop as needed.
+
+import com.mongodb.MongoClient;
+import com.mongodb.client.AggregateIterable;
+import com.mongodb.client.MongoCollection;
+import com.mongodb.client.MongoDatabase;
+import org.bson.Document;
+
+import java.util.Arrays;
+
+public class QueryLatestVersionMultipleRecordsExample {
+    public static void main(String[] args) {
+        // Connect to MongoDB server
+        MongoClient mongoClient = new MongoClient("localhost", 27017);
+
+        // Access the database
+        MongoDatabase database = mongoClient.getDatabase("your_database_name");
+
+        // Access the collection
+        MongoCollection<Document> collection = database.getCollection("your_collection_name");
+
+        // Create the aggregation pipeline to query latest versions
+        AggregateIterable<Document> result = collection.aggregate(Arrays.asList(
+                new Document("$sort", new Document("version", -1)), // Sort by version in descending order
+                new Document("$group",
+                        new Document("_id", "$key") // Group by the key field
+                                .append("latestVersion", new Document("$first", "$version")) // Get the first (latest) version
+                                .append("document", new Document("$first", "$$ROOT")) // Get the entire document corresponding to the latest version
+                )
+        ));
+
+        // Iterate over the result
+        for (Document document : result) {
+            // Process the document as needed
+            System.out.println(document.get("document"));
+        }
+
+        // Close the connection
+        mongoClient.close();
+    }
+}
+
+Certainly! Here's the equivalent code in Python using the pymongo library:
+Make sure to replace 'your_database_name' and 'your_collection_name' with the actual names of your database and collection. 
+Adjust the field names ('key', 'version', etc.) in the pipeline to match your document structure.
+
+The code uses the pymongo library to connect to the MongoDB server, access the database and collection, and execute the aggregation pipeline. 
+It retrieves the latest version documents for each key and processes them within the loop.
+
+from pymongo import MongoClient
+
+# Connect to MongoDB server
+mongo_client = MongoClient('localhost', 27017)
+
+# Access the database
+database = mongo_client['your_database_name']
+
+# Access the collection
+collection = database['your_collection_name']
+
+# Create the aggregation pipeline to query latest versions
+pipeline = [
+    {"$sort": {"version": -1}},  # Sort by version in descending order
+    {"$group": {
+        "_id": "$key",  # Group by the key field
+        "latestVersion": {"$first": "$version"},  # Get the first (latest) version
+        "document": {"$first": "$$ROOT"}  # Get the entire document corresponding to the latest version
+    }}
+]
+
+# Execute the aggregation pipeline
+result = collection.aggregate(pipeline)
+
+# Iterate over the result
+for document in result:
+    # Process the document as needed
+    print(document['document'])
+
+# Close the connection
+mongo_client.close()
+
+Sample MongoDB document:
+[
+  { "_id": 1, "key": "A", "version": 1, "data": "Sample data 1" },
+  { "_id": 2, "key": "A", "version": 2, "data": "Sample data 2" },
+  { "_id": 3, "key": "B", "version": 1, "data": "Sample data 3" },
+  { "_id": 4, "key": "B", "version": 2, "data": "Sample data 4" },
+  { "_id": 5, "key": "C", "version": 1, "data": "Sample data 5" }
+]
+
