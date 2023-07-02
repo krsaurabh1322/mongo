@@ -187,3 +187,30 @@ Sample MongoDB document:
   { "_id": 5, "key": "C", "version": 1, "data": "Sample data 5" }
 ]
 
+you can insert documents with composite keys and version numbers:
+// Insert the sample documents
+db.your_collection_name.insertMany([
+  { "_id": { "key": "A", "version": 1 }, "data": "Sample data 1" },
+  { "_id": { "key": "A", "version": 2 }, "data": "Sample data 2" },
+  { "_id": { "key": "B", "version": 1 }, "data": "Sample data 3" },
+  { "_id": { "key": "B", "version": 2 }, "data": "Sample data 4" },
+  { "_id": { "key": "C", "version": 1 }, "data": "Sample data 5" }
+])
+
+// Query for the latest version of each record
+db.your_collection_name.aggregate([
+  // Sort by version in descending order
+  { $sort: { "_id.version": -1 } },
+  
+  // Group by the key and get the first (latest) version for each key
+  { $group: {
+    _id: "$_id.key",
+    latestVersion: { $first: "$_id.version" },
+    document: { $first: "$$ROOT" }
+  }}
+])
+
+In the above example, we first sort the documents in descending order based on the version ("_id.version"). 
+Then, we group the documents by the key ("_id.key"), and for each group, we retrieve the first (latest) version 
+and the corresponding document. 
+The result will include the latest version of each record for each key.
