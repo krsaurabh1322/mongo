@@ -149,7 +149,16 @@ public class MongoDBVersioningExample {
 
 
 Presentation outline:
-Title: Implementing Versioning in Database
-Design the schema:
-In order to track the historical changes of a document/record and maintain a versioning system, keep a version field to track
-the document's version. This field can be incremented with each update
+
+Solution: Implement versioning in Database to track data changes and thus retain the full history of values in Database.
+
+Versioning allows us to track and manage the different iterations or versions of a document/record over time. It also helps to 
+retain the full history of values which is both auditable and efficient in terms of storage.
+
+Implementaion: 
+Design the schema
+In order to track the historical changes of a document/record, we introduce a column in the collection/table to store the version information.
+This information is updated/incremented with each update. 
+As this scenario falls under a data warehouse concept called Slowly Changing Dimension (SCD), we apply the Type 2 SCD solution here. 
+When the value of an attribute changes, the current record is closed and a new record is created with the changed data values and this 
+new record becomes the current record. Each record contains the startdate time and closedate time to identify the time period between which the record was active. 
