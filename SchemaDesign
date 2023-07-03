@@ -5,7 +5,7 @@ By using a separate version field and a history array, we can track the document
 while keeping the _id field consistent.
 
 db.counterparties.insertOne({
-  _id: ObjectId("609f4e00c749bf0f74a8f3af"),
+  _id: 1,
   counterparty_id: 1,
   version: 2,
   name: "Counterparty 1",
@@ -67,3 +67,89 @@ CREATE TABLE counterparties_history (
   closedate TIMESTAMP,
   FOREIGN KEY (counterparty_id) REFERENCES counterparties (counterparty_id)
 );
+
+An implemenatin of update method for Mongodb:
+
+Retrieves the document from Hazelcast, if the document is not found in Hazelcast, it falls back to retrieving it from MongoDB.
+Clones the existing document to create a historical record.
+Gets the current version and increments it.
+Updates the version and data fields in the document with the new values.
+Creates a new historical version with the previous version number, current timestamp, and the data from the cloned document.
+Adds the historical version to the history array of the cloned document.
+Replaces the document in MongoDB with the updated version.
+Updates the document in Hazelcast.
+Inserts the historical record into the MongoDB collection.
+
+import com.hazelcast.core.HazelcastInstance;
+import com.hazelcast.core.IMap;
+import com.mongodb.client.MongoCollection;
+import com.mongodb.client.MongoDatabase;
+import org.bson.Document;
+
+import java.util.Date;
+
+public class MongoDBVersioningExample {
+    private final HazelcastInstance hazelcastInstance;
+    private final MongoDatabase mongoDatabase;
+    private final String collectionName;
+
+    public MongoDBVersioningExample(HazelcastInstance hazelcastInstance, MongoDatabase mongoDatabase, String collectionName) {
+        this.hazelcastInstance = hazelcastInstance;
+        this.mongoDatabase = mongoDatabase;
+        this.collectionName = collectionName;
+    }
+
+    public void updateDocument(String documentId, Document updatedData) {
+        // Get the distributed map from Hazelcast
+        IMap<String, Document> documentMap = hazelcastInstance.getMap(collectionName);
+
+        // Get the Mongo collection
+        MongoCollection<Document> collection = mongoDatabase.getCollection(collectionName);
+
+        // Retrieve the document from Hazelcast or MongoDB
+        Document document = documentMap.get(documentId);
+        if (document == null) {
+            document = collection.find(new Document("_id", documentId)).first();
+        }
+
+        // Check if the document exists
+        if (document != null) {
+            // Clone the existing document to create a historical record
+            Document historicalRecord = new Document(document);
+
+            // Get the current version and increment it
+            int currentVersion = document.getInteger("version");
+            int newVersion = currentVersion + 1;
+
+            // Update the version field in the document
+            document.put("version", newVersion);
+
+            // Set the updated data in the document
+            document.put("data", updatedData);
+
+            // Create a new historical record with the updated version and timestamp
+            Document historicalVersion = new Document("version", currentVersion)
+                    .append("timestamp", new Date())
+                    .append("data", historicalRecord.get("data"));
+
+            // Add the historical version to the history array
+            ((List<Document>) historicalRecord.get("history")).add(historicalVersion);
+
+            // Replace the document in MongoDB
+            collection.replaceOne(new Document("_id", documentId), document);
+
+            // Update the document in Hazelcast
+            documentMap.put(documentId, document);
+
+            // Insert the historical record into MongoDB
+            collection.insertOne(historicalRecord);
+        }
+    }
+}
+
+
+Presentation outline:
+Title: Implementing Versioning in Database
+Design the schema:
+In order to track the historical changes of a document/record and maintain a versioning system, keep a version field to track
+the document's version. This field can be incremented with each update
