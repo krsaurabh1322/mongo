@@ -1,0 +1,69 @@
+Schema design for versioning and historical records in MongoDB
+
+A single collection for both the main data and the historical records.
+By using a separate version field and a history array, we can track the document's changes over time 
+while keeping the _id field consistent.
+
+db.counterparties.insertOne({
+  _id: ObjectId("609f4e00c749bf0f74a8f3af"),
+  counterparty_id: 1,
+  version: 2,
+  name: "Counterparty 1",
+  address: "Address 1 New",
+  startdate: ISODate("2023-07-10T09:30:00Z"),
+  history: [
+    {
+      counterparty_id: 1,
+      version: 1,
+      name: "Counterparty 1",
+      address: "Address 1",
+      startdate: ISODate("2023-07-03T10:30:00Z"),
+      closedate: ISODate("2023-07-10T09:30:00Z")      
+    },
+    // Other historical versions
+  ]
+})
+
+OR
+We can keep the main data collection separate from the historical records collection, thus
+providing better organization and potentially optimizing performance.
+
+db.counterparties.insertOne({
+  _id: 1, // Unique identifier for the counterparty
+  counterparty_id: 1,
+  name: "Counterparty 1",
+  address: "Address 1 New",
+  startdate: ISODate("2023-07-10T09:30:00Z"),
+  version: 2 // Current version number of the counterparty record
+})
+
+db.counterparties_history.insertOne({
+  _id: ObjectId(), // a new unique identifier for each historical record or use counterparty_id and version as composite primary key
+  counterparty_id: 1,
+  version: 1,
+  name: "Counterparty 1",
+  address: "Address 1",
+  startdate: ISODate("2023-07-03T10:30:00Z"),
+  closedate: ISODate("2023-07-10T09:30:00Z")  
+})
+
+Schema for both the main table (counterparties) and the historical table (counterparties_history)
+
+CREATE TABLE counterparties (
+  counterparty_id VARCHAR(100) PRIMARY KEY,
+  name VARCHAR(100),
+  address VARCHAR(1000),
+  startdate TIMESTAMP,
+  closedate TIMESTAMP
+);
+
+CREATE TABLE counterparties_history (
+  id VARCHAR(100) PRIMARY KEY, // counterparty_id and version together form the composite primary key
+  counterparty_id VARCHAR(100),
+  version INTEGER,
+  name VARCHAR(100),
+  address VARCHAR(1000),
+  startdate TIMESTAMP,
+  closedate TIMESTAMP,
+  FOREIGN KEY (counterparty_id) REFERENCES counterparties (counterparty_id)
+);
