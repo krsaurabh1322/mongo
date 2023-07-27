@@ -1,3 +1,6 @@
+Since modules in Python are singletons (imported only once), you can access the same logger instance from other modules 
+after it's set up in the main module.
+
 import logging
 import time
 
