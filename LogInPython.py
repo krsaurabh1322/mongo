@@ -33,7 +33,8 @@ def log_execution_time(func):
 log_file="path/to/your_log_file.log"
 
 # Call the Python module with the log file argument
-python your_module.py --log_file_path "$log_file" > output.log
+python your_module.py --log_file_path "$log_file" > output.log 2>&1
+
 
 #--------------------------------
 import argparse
@@ -63,3 +64,7 @@ if __name__ == "__main__":
         setup_logger("default_log_file.log")
 
     your_function_to_log()
+
+Here the time execution logs captured by the logger_utils.log_execution_time decorator will be written to the log file specified by "$log_file".
+Meanwhile, the standard output and any error messages will be redirected to "output.log" due to the shell redirection. 
+The two types of logs will be separated in different files.
