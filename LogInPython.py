@@ -1,14 +1,16 @@
 Since modules in Python are singletons (imported only once), you can access the same logger instance from other modules 
 after it's set up in the main module.
 
+
 import logging
 import time
+import inspect
 
 def setup_logger(log_file_path):
     logging.basicConfig(
         level=logging.DEBUG,
         format='%(asctime)s - %(levelname)s - %(message)s',
-        datefmt='%Y-%m-%d %H:%M:%S',
+        datefmt='%Y-%m-%d %H:%M:%S.%f',
         filename=log_file_path,
         filemode='a'
     )
@@ -16,29 +18,36 @@ def setup_logger(log_file_path):
 def log_execution_time(func):
     def wrapper(*args, **kwargs):
         start_time = time.time()
-        logging.info(f'Start time: {start_time}')
-
         result = func(*args, **kwargs)
-
         end_time = time.time()
         execution_time = end_time - start_time
-        logging.info(f'End time: {end_time}')
-        logging.info(f'Execution time: {execution_time:.2f} seconds')
+        hours, remainder = divmod(execution_time, 3600)
+        minutes, seconds = divmod(remainder, 60)
+        execution_time_str = f'{int(hours)}h {int(minutes)}m {seconds:.2f}s'
+        logging.info(f'{get_formatted_timestamp()} - [{func.__name__}] - Execution time: {execution_time_str}')
         return result
 
     return wrapper
 
 def log_info(message):
-    logging.info(message)
+    function_name = inspect.stack()[1].function
+    logging.info(f'{get_formatted_timestamp()} - [{function_name}] - {message}')
 
 def log_warning(message):
-    logging.warning(message)
+    function_name = inspect.stack()[1].function
+    logging.warning(f'{get_formatted_timestamp()} - [{function_name}] - {message}')
 
 def log_error(message):
-    logging.error(message)
+    function_name = inspect.stack()[1].function
+    logging.error(f'{get_formatted_timestamp()} - [{function_name}] - {message}')
 
 def log_critical(message):
-    logging.critical(message)
+    function_name = inspect.stack()[1].function
+    logging.critical(f'{get_formatted_timestamp()} - [{function_name}] - {message}')
+
+def get_formatted_timestamp():
+    return time.strftime('%Y-%m-%d %H:%M:%S')
+
 
 #--------------------------------
 
