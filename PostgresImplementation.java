@@ -166,3 +166,131 @@ public class PostgresVersionedRepository<K, V extends Entity<K>> extends Postgre
 
     private boolean areRecordsEqual(Map<String, Object> oldValue, Map<String, Object> newValue) {
         // Implement
+}
+
+////////////
+
+
+import com.scb.cat.common.cache.store.CacheStore;
+import com.scb.cat.common.jdbc.ResultSetHelper;
+import com.scb.cat.common.logging.LoggerFactory;
+import com.scb.cat.common.model.Entity;
+import com.scb.cat.common.repository.RepositoryConfig;
+import com.scb.cat.common.repository.model.Field;
+import com.scb.cat.common.repository.model.FieldType;
+import com.scb.cat.common.repository.model.ModelSpec;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.text.StringSubstitutor;
+import org.slf4j.Logger;
+
+import javax.sql.DataSource;
+import java.sql.Connection;
+import java.sql.ParameterMetaData;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import static com.google.common.base.Preconditions.checkArgument;
+import static java.lang.String.format;
+import static java.util.stream.Collectors.joining;
+import static java.util.stream.Collectors.toMap;
+
+public class VersionedJdbcCacheStore<K, V extends Entity<K>> implements CacheStore<K, V> {
+
+    private final Logger logger;
+    private final ModelSpec modelSpec;
+    private final RepositoryConfig<K, V> repositoryConfig;
+    private final DataSource dataSource;
+    private final StatementGenerator select;
+    private final StatementGenerator delete;
+    private final StatementGenerator upsert;
+    private final StatementGenerator historyInsert;
+
+    public VersionedJdbcCacheStore(final LoggerFactory loggerFactory,
+                                   final RepositoryConfig<K, V> repositoryConfig,
+                                   final DataSource dataSource) {
+        this.logger = loggerFactory.create(VersionedJdbcCacheStore.class);
+        this.repositoryConfig = repositoryConfig;
+        this.modelSpec = repositoryConfig.modelSpec();
+        this.dataSource = dataSource;
+        select = new StatementGenerator(select());
+        delete = new StatementGenerator(delete());
+        upsert = new StatementGenerator(upsert());
+        historyInsert = new StatementGenerator(historyInsert());
+    }
+
+    // ... Other methods ...
+
+    private String historyInsert() {
+        final StringBuilder sb = new StringBuilder()
+                .append(format(INSERT_FORMAT, modelSpec.getHistoryTableName()))
+                .append(modelSpec.getFields().stream()
+                        .map(Field::getDbName)
+                        .collect(joining(",", "(", ")")))
+                .append(format(VALUES_FORMAT, modelSpec.getFields().stream()
+                        .map(f -> format(REPLACEMENT_FORMAT, f.getName()))
+                        .collect(joining(", ", "(", ")"))));
+        return sb.toString();
+    }
+
+    private void storeHistoryVersion(final K key, final V value, final LocalDateTime timestamp) {
+        try (Connection connection = dataSource.getConnection();
+             PreparedStatement historyInsertStatement = historyInsert.create(connection)) {
+            historyInsertStatement.setObject(1, key);
+            historyInsertStatement.setObject(2, value.getVersion());
+            for (int i = 0; i < modelSpec.getFields().size(); i++) {
+                final Field field = modelSpec.getFields().get(i);
+                final Object fieldValue = value.getFields().get(field.getName());
+                final int statementIndex = i + 3;
+                if (fieldValue == null) {
+                    historyInsertStatement.setNull(statementIndex, field.getType().getSqlType());
+                } else {
+                    historyInsertStatement.setObject(statementIndex, fieldValue);
+                }
+            }
+            historyInsertStatement.setObject(modelSpec.getFields().size() + 3, timestamp);
+            historyInsertStatement.executeUpdate();
+        } catch (SQLException e) {
+            logger.warn("Failed to insert historical version for key: " + key, e);
+        }
+    }
+
+    @Override
+    public void store(final K key, final V value) {
+        try (Connection connection = dataSource.getConnection();
+             PreparedStatement upsertStatement = upsert.create(connection, value)) {
+            // execute the upsert statement and commit if successful
+            upsertStatement.executeUpdate();
+            logger.debug("Stored: [key={}]", key);
+
+            // Store the historical version
+            LocalDateTime timestamp = LocalDateTime.now(); // Replace with your timestamp generation logic
+            storeHistoryVersion(key, value, timestamp);
+        } catch (SQLException e) {
+            logger.warn("Failed to store entity [key={}]", key, e);
+        }
+    }
+
+    // ... Other methods ...
+
+    private final class StatementGenerator {
+        // ... Existing code ...
+
+        PreparedStatement create(final Connection connection, final V entity, final int version) throws SQLException {
+            return create(connection, entity.getFields(), version);
+        }
+
+        // ... Existing code ...
+    }
+
+    // ... Existing code ...
+}
+///////////////
