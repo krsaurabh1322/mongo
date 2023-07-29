@@ -460,3 +460,12 @@ public enum AggregationFunction {
   private AggregationFunction () {
   }
 }
+
+////////////
+
+public class SparkDataSourceConfig implements Serializable {
+private SparkDatasourceType datasource Type;
+private Map<DataSourceParamKey, String> dataSourceConfig;
+}
+
+////////////
