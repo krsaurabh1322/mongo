@@ -10,75 +10,73 @@ import org.slf4j.Logger;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
-* Created by 1618018 on 3/18/2021.
-*/
+
 public class SparkDataSourceProvider {
-B
+
 private final Logger logger;
 private Map<SparkDatasourceType, SparkDataSource> registry;
 @Inject
-public SparkDataSource Provider (final LoggerFactory loggerFactory, final Set<SparkDataSource> allSparkDatasources) {
-this.logger = loggerFactory.create (SparkDataSource Provider.class);
-this.registry = allSparkDatasources.stream ().collect (
+public SparkDataSourceProvider (final LoggerFactory loggerFactory, final Set<SparkDataSource> allSparkDatasources) {
+  this.logger = loggerFactory.create (SparkDataSourceProvider.class);
+  this.registry = allSparkDatasources.stream ().collect (
+    Collectors.toMap (x -> x.getDataSourceType (), x -> x));
+  logger.info ("Registered {} Spark DataSources of Types-{}", registry.size(), registry.keySet());
 }
-Collectors.toMap (x -> x.getDataSourceType (), x -> x));
-logger.info ("Registered ) Spark DataSources of Types-()", registry.size(), registry.keySet());
 
 
-8
 public SparkDataSource get (final SparkJobRequest request, final SparkDatasourceType dsType) {
-final SparkDataSource dataSource = registry.get (dsType);
+  final SparkDataSource dataSource = registry.get (dsType);
+  
+  if (dataSource = null) {
+    logger.error ("Unregistered DataSource of Type () for Request Id ()", dsType, request.getUniqueRequestId());
+  }
+  return dataSource;
 }
-if (dataSource = null) {
-logger.error ("Unregistered DataSource of Type () for Request Id ()", dsType, request.getUniqueRequestId());
-}
-}
-return dataSource;
+
 public void outgest (final SparkJobRequest request, final Dataset<Row> sparkOutput) {
-final SimpleTimerUtil timer = new SimpleTimerUtil(logger);
-final SparkDataSource ds = this.get (request, request.getOutput DataSource ().getDatasourceType());
-if (ds != null) {
-ds.publish (request, sparkoutput);
-timer.logEvent ("sparkAggregation-save sparkoutput", request.getUnique RequestId());
+  final SimpleTimerUtil timer = new SimpleTimerUtil(logger);
+  final SparkDataSource ds = this.get (request, request.getOutputDataSource ().getDatasourceType());
+  if (ds != null) {
+    ds.publish (request, sparkoutput);
+  }
+  timer.logEvent ("sparkAggregation-save sparkoutput", request.getUniqueRequestId());
 }
+
 public Dataset<Row> ingest (SparkJobRequest request, Object filter) {
-final SimpleTimerUtil timerUtil = new SimpleTimerUtil(logger);
-final SparkDataSource ds = this.get (request, request.getInput DataSource ().getDatasourceType());
-final Dataset<Row> dfPair = ds.load (request; filter);
-timerUtil.logEvent ("MongoSpark-load", request.getUniqueRequestId());
-return dfPair;}
+  final SimpleTimerUtil timerUtil = new SimpleTimerUtil(logger);
+  final SparkDataSource ds = this.get (request, request.getInputDataSource ().getDatasourceType());
+  final Dataset<Row> dfPair = ds.load (request; filter);
+  timerUtil.logEvent ("MongoSpark-load", request.getUniqueRequestId());
+  return dfPair;}
 }
 
 
-
-_------++++++++++++++
+//////////////////////////////////////////////
 
 public interface SparkDataSource<T> {
-→
-O
-SparkDatasourceType getDataSourceType();
-Dataset<Row> Load(final SparkJobRequest req, T filter);
-boolean publish (SparkJobRequest request, Dataset<Row> sparkOutput);
-default String getInputSourceName (final SparkJobRequest req) {
-return req.getInputDataSource().getDataSource Config().get (DataSourceParamKey.INPUT_COLLECTION_NAME);
+
+  SparkDatasourceType getDataSourceType();
+  Dataset<Row> Load(final SparkJobRequest req, T filter);
+  boolean publish (SparkJobRequest request, Dataset<Row> sparkOutput);
+
+  default String getInputSourceName (final SparkJobRequest req) {
+    return req.getInputDataSource().getDataSourceConfig().get (DataSourceParamKey.INPUT_COLLECTION_NAME);
+  }
+  
+  static Column[] initColumnProjections (final String csvColumns) {
+    final List<Column> columnProjection = Splitter.on (COMMA_SEPARATOR)
+      .splitToList(csvColumns) 
+      .stream() Stream <String>
+      .map (functions::col) 
+      .collect (Collectors.toList());
+    return columnProjection.toArray (new Column [columnProjection.size()]);
+  }
 }
-static Column[] initColumn Projections (final String csvColumns) {
-final List<Column> columnProjection = Splitter.on (COMMA_SEPARATOR) Splitter
-.splitToList(csvColumns) List<String>
-.stream() Stream <String>
-.map (functions::col) Stream <Column>
-collect (Collectors.toList());
-return columnProjection, toArray (new Column [column Projection.size()]);}}
 
+//////////////////////////////////////////////
 
--------------+++++
-A */
 public class SparkMongoDataSource implements SparkDataSource<List<Document>> {
-P
-O
-O
-G
-A
+
 private final Logger logger;
 private final SparkContextProvider sparkContextProvider;
 private final Config config;
@@ -86,340 +84,331 @@ private final Config config;
 public SparkMongoDataSource(final LoggerFactory loggerFactory,
 final SparkContextProvider sparkContextProvider,
 final Config config) {
+
+  this.logger = LoggerFactory.create (SparkMongoDataSource.class);
+  this.sparkContextProvider = sparkContextProvider;
+  this.config = config;
 }
-this.logger = LoggerFactory.create (SparkMongoDataSource.class);
-this.sparkContextProvider = sparkContextProvider;
-this.config = config;
-vider.java
 @Override
-public SparkDatasourceType getDataSourceType() { return SparkDatasourceType.MONGO;
+public SparkDatasourceType getDataSourceType() { return SparkDatasourceType.MONGO;}
+
 @Override
 public Dataset<Row> Load(final SparkJobRequest request,
-}
-final ReadConfig readConf = ReadConfig.create(sparkReadConf);
-SparkSolaceDataSource.java
-final List<Document> filter) {
-final SparkConf sparkReadConf = sparkContextProvider.getDefaultReadSparkConf (request);
-final String collectionName = getInputSourceName (request);
-final DfCacheSourceKey dfCacheKey = DfCacheSourceKey.from SourceName (collectionName);
-final StructType schema= dfCacheKey.getSchema ();
-if (nonNull(schema)) {
-return LoadWithSchema (schema, request, filter);
-I}
+  final List<Document> filter) {
+  final SparkConf sparkReadConf = sparkContextProvider.getDefaultReadSparkConf (request);
+  final String collectionName = getInputSourceName (request);
+  final DfCacheSourceKey dfCacheKey = DfCacheSourceKey.from SourceName (collectionName);
+  final StructType schema= dfCacheKey.getSchema ();
+  if (nonNull(schema)) {
+    return loadWithSchema (schema, request, filter);
+  }
+  final ReadConfig readConf = ReadConfig.create(sparkReadConf);
 
-
+  final JavaMongoRDD<Document> rdd = MongoSpark.load(this.sparkContextProvider.getJavaSparkContext(), readConf);
+  final JavaMongoRDD<Document> rddLocal = filter != null ? rdd.withPipeline (filter) : rdd;
+  final Column[] colProjections = dfCacheKey.getSparkColProjections (request, config);
+  Logger.info("Loaded Mongo collection into RDD [collectionName={}, jobId={}]", collectionName, request.getUniqueRequestId());
+  final Dataset<Row> dfloaded = colProjections == null ? rddLocal. toDF (): rddLocal. toDF ()
+    .select(colProjections);
+  return dfloaded;
 }
-return dfloaded;
-final ReadConfig readConf = ReadConfig.create (sparkReadConf);
-final JavaMongoRDD<Document> rdd = MongoSpark.load(this.sparkContextProvider.getJavaSparkContext(), readConf);
-final JavaMongoRDD<Document> rddLocal = filter != null ? rdd.withPipeline (filter) : rdd;
-final Column[] colProjections = dfCacheKey.getSparkColProjections (request, config);
-Logger.info("Loaded Mongo collection into RDD [collectionName={}, jobId={}]", collectionName, request.getUniqueRequestId());
-final Dataset<Row> dfloaded = colProjections == null ? rddLocal. toDF (): rddLocal. toDF ()
-.select(colProjections);
+
 private Dataset<Row> LoadWithSchema (final StructType schema,
-final SparkJobRequest request,
-final List<Document> pipeline) {
-final String jobId = request.getUniqueRequestId();
-final SparkConf sparkReadConf = sparkContextProvider.getDefaultReadSparkConf (request);
-final DfCacheSourceKey dfCacheKey = DfCacheSourceKey.fromSourceName (getInputSourceName (request));
-final String collectionName= dfCacheKey.getSourceName();
-final ReadConfig readConf = getReadConfigWithSchema (dfCacheKey.getSourceName(), sparkReadConf, schema);
-Logger.info("Loading mongo records into Spark dataFrame [jobId={}, collectionName={}, schema={}]", jobId, collectionName, schema.catalogString());
-final Dataset<Row> dataset = nonNull (pipeline) ? MongoSpark. Load (sparkContextProvider.getJavaSparkContext(), readConf)
-.withPipeline (pipeline)
-.rdd ()
-.toDF (schema): MongoSpark. Load(sparkContextProvider.getJavaSparkContext(), readConf)
-.rdd ()
-.toDF(schema);
-final String catalogString = dataset.schema ()
+  final SparkJobRequest request,
+  final List<Document> pipeline) {
+  final String jobId = request.getUniqueRequestId();
+  final SparkConf sparkReadConf = sparkContextProvider.getDefaultReadSparkConf (request);
+  final DfCacheSourceKey dfCacheKey = DfCacheSourceKey.fromSourceName (getInputSourceName (request));
+  final String collectionName= dfCacheKey.getSourceName();
+  final ReadConfig readConf = getReadConfigWithSchema (dfCacheKey.getSourceName(), sparkReadConf, schema);
+  Logger.info("Loading mongo records into Spark dataFrame [jobId={}, collectionName={}, schema={}]", jobId, collectionName, 
+    schema.catalogString());
+  final Dataset<Row> dataset = nonNull (pipeline) ? MongoSpark. Load (sparkContextProvider.getJavaSparkContext(), readConf)
+    .withPipeline (pipeline)
+    .rdd ()
+    .toDF (schema): MongoSpark. Load(sparkContextProvider.getJavaSparkContext(), readConf)
+    .rdd ()
+    .toDF(schema);
+  final String catalogString = dataset.schema ().catalogString();
+  logger.info("Loaded mongo records into Spark dataFrame and explicit Schema applied [jobId=(), collectionName={}, schema=(), datasetColumns={}]",
+  jobId, dfCacheKey.getSourceName(), catalogString, ArrayUtils.toString(dataset.columns()));
+
+  return dataset;
 }
-return dataset;
+
 @Override
 public boolean publish (final SparkJobRequest request,
-final Dataset<Row> sparkOutput) {
-.catalogString();
-logger.info("Loaded mongo records into Spark dataFrame and explicit Schema applied [jobId=(), collectionName={}, schema=(), datasetColumns={}]",
-jobId, dfCacheKey.getSourceName(), catalogString, ArrayUtils.toString(dataset.columns()));
-SparkDataSource.java x SparkMongoDataSource Java
-final SparkConf sparkWriteConf = sparkContextProvider.getDefaultWriteSparkConf (request);
-final WriteConfig config = WriteConfig.create (sparkWrite Conf);
-MongoSpark.save (sparkOutput.write()
-.mode (SaveMode.Overwrite), config);
-return true;
+  final Dataset<Row> sparkOutput) {
+  final SparkConf sparkWriteConf = sparkContextProvider.getDefaultWriteSparkConf (request);
+  final WriteConfig config = WriteConfig.create (sparkWrite Conf);
+  MongoSpark.save (sparkOutput.write().mode (SaveMode.Overwrite), config);
+  return true;
+}
+
 private ReadConfig getReadConfigWithSchema (final String collectionName,
 final SparkConf sparkReadConf,
 final StructType schema) {
-SparkContextProvider.java x
-readOverrides.put(k "inferSchema", v: "false");
-readOverrides.put(k "schema", schema.json());
-return ReadConfig.create(sparkReadConf)
-.withOptions (readOverrides);
-SparkSolaceDataSource javax SparkDataFrame
-Logger.info("Found explicit schema [collectionName={}, catalogString={}, fieldNames={}, length={}]", collectionName, schema.catalogString(),
-ArrayUtils.toString(schema.fieldNames ()), schema.Length());
-final Map<String, String> readOverrides Maps.newHashMap ();
+  logger.info("Found explicit schema [collectionName={}, catalogString={}, fieldNames={}, length={}]", collectionName, schema.catalogString(),
+  ArrayUtils.toString(schema.fieldNames ()), schema.Length());
+  final Map<String, String> readOverrides Maps.newHashMap ();
+  readOverrides.put(k "inferSchema", v: "false");
+  readOverrides.put(k "schema", schema.json());
+  return ReadConfig.create(sparkReadConf)
+  .withOptions (readOverrides);
 }
 
+//////////////////////////////////////////////
 
-
-5
 public class SparkBIFunction implements SparkJobFunction<SparkJobRequest, SparkJobResponse> {
-private final Logger logger;
-private final Config config;
-private final boolean populateRowNum;
-private final SparkDataFrameCacheManager dfCacheManager;
-private final RequestStatePublisher statePublisher;
-private final SparkDataSourceProvider dataSourceProvider;
-private final SparkColumnFilterParser columnFilterParser;
-private final MultiDimensionalAggFunction multiDimensionalAggFunction;
-public SparkBIFunction (final LoggerFactory LoggerFactory, final Config config, final SparkContextProvider sparkContextProvider,
-final SparkDataFrameCacheManager dfCacheManager, final RequestState Publisher statePublisher,
-final SparkDataSourceProvider dataSourceProvider, final SparkColumnFilterParser columnFilterParser,
-final MultiDimensionalAggFunction multiDimensionalAggFunction) {
-}
-this.logger = LoggerFactory.create(SparkBIFunction.class);
-this.config = config;
-this.populateRowNum = SparkCoreConfigDefinitions.SPARK_CORE_JOB_POPULATE_ROWNUM.get(this.config);
-final JavaSparkContext context = sparkContextProvider.getJavaSparkContext();
-this.dfCacheManager = dfCacheManager;
-this.statePublisher
-statePublisher;
-this.dataSourceProvider = dataSourceProvider;
-this.columnFilterParser = columnFilterParser;
-this.multidimensionalAggFunction = multiDimensionalAggFunction;
-foonkBIFunction.class.getSimpleName(); }
+  private final Logger logger;
+  private final Config config;
+  private final boolean populateRowNum;
+  private final SparkDataFrameCacheManager dfCacheManager;
+  private final RequestStatePublisher statePublisher;
+  private final SparkDataSourceProvider dataSourceProvider;
+  private final SparkColumnFilterParser columnFilterParser;
+  private final MultiDimensionalAggFunction multiDimensionalAggFunction;
 
-$
+  public SparkBIFunction (final LoggerFactory LoggerFactory, final Config config, final SparkContextProvider sparkContextProvider,
+  final SparkDataFrameCacheManager dfCacheManager, final RequestStatePublisher statePublisher,
+  final SparkDataSourceProvider dataSourceProvider, final SparkColumnFilterParser columnFilterParser,
+  final MultiDimensionalAggFunction multiDimensionalAggFunction) {
+  
+    this.logger = LoggerFactory.create(SparkBIFunction.class);
+    this.config = config;
+    this.populateRowNum = SparkCoreConfigDefinitions.SPARK_CORE_JOB_POPULATE_ROWNUM.get(this.config);
+    final JavaSparkContext context = sparkContextProvider.getJavaSparkContext();
+    this.dfCacheManager = dfCacheManager;
+    this.statePublisher
+    statePublisher;
+    this.dataSourceProvider = dataSourceProvider;
+    this.columnFilterParser = columnFilterParser;
+    this.multidimensionalAggFunction = multiDimensionalAggFunction;
+  }
+
+  public static String getFunctionName() { return SparkBIFunction.class.getSimpleName(); }
+
 @Override
-E public SparkJobResponse apply(final SparkJobRequest request) {
-ContextProvider.java
-public static String getFunctionName() { return SparkBIFunction.class.getSimpleName(); }
-final SparkJobResponseBuilder builder = SparkJobResponse.builder()
-.original Request (request)
-? request.getParentReportId()
-: request.getUniqueRequestId());
-SparkDataFrameCacheManager.java
-.uniqueRequestId(request.getUniqueRequestId())
-//Normally primary ReportId is same as reportId.
-//It differs when one UI report is computed using multiple Spark Job requests and joined on UI for presentation.
-.parentReportId (request.getParent ReportId() != null
-Logger.info("Thread - Solace channel {}- SparkBIFunction Processing Spark Job request - {}",
-currentThread().getName(), channelForSparkCore (), request.getUniqueRequestId());
-final SimpleTimerUtil timer = new Simple TimerUtil(logger);|
-try {
-if (!validateRequest (request, builder)) {
-return prepareResponse (request, builder, timer);
-}
-}
-if (request.getCacheDfRequest Param().isRefresh IntradayCache()) {
-final Dataset<Row> df = dfCacheManager.doIntraDayCache Refresh (request, builder);
-sparkAggregation (request, df, builder);
-return prepareResponse (request, builder, timer);
-MultiDimensionalAggFunction.java
-if (request.getCacheDfRequest Param().isDeltaRefreshCache()) {
-final Dataset<Row> df = dfCacheManager.doDeltaCache Refresh (request, builder);
+public SparkJobResponse apply(final SparkJobRequest request) {
 
-Durce.java X
+  final SparkJobResponseBuilder builder = SparkJobResponse.builder()
+  .original Request (request)
+  .uniqueRequestId(request.getUniqueRequestId())
+  //Normally primary ReportId is same as reportId.
+  //It differs when one UI report is computed using multiple Spark Job requests and joined on UI for presentation.
+  .parentReportId (request.getParent ReportId() != null
+  ? request.getParentReportId()
+  : request.getUniqueRequestId());
+  
+  logger.info("Thread - Solace channel {}- SparkBIFunction Processing Spark Job request - {}",
+  currentThread().getName(), channelForSparkCore (), request.getUniqueRequestId());
+
+  final SimpleTimerUtil timer = new Simple TimerUtil(logger);|
+  try {
+    if (!validateRequest (request, builder)) {
+      return prepareResponse (request, builder, timer);
+    }
+    if (request.getCacheDfRequest Param().isRefresh IntradayCache()) {
+      final Dataset<Row> df = dfCacheManager.doIntraDayCache Refresh (request, builder);
+      sparkAggregation (request, df, builder);
+      return prepareResponse (request, builder, timer);
+    }
+    if (request.getCacheDfRequest Param().isDeltaRefreshCache()) {
+      final Dataset<Row> df = dfCacheManager.doDeltaCache Refresh (request, builder);
+      sparkAggregation (request, df, builder);
+      return prepare Response (request, builder, timer);
+    }
+  
+    dfCacheManager.prepareHistoricalCacheRefresh(request);
+    if (dfCacheManager.isDfCacheValid (request, builder)) {
+      final Dataset<Row> df = dfCacheManager.getCachedDF to ProcessRequest (request);
+      sparkAggregation (request, df, builder);
+    } else {
+      return prepareResponse (request, builder, timer);
+    }
+  } catch (final Throwable throwable) {
+    builder.requestState (SparkJobRequestState.FAILED);
+    logger.warn("SparkBIFunction - Unable to process job-{}", request.getUniqueRequestId(), throwable);
+  }
+  return prepareResponse (request, builder, timer);
 }
-ⒸDfCacheData java X
-}
-ⒸDfCacheSourceKey.java
-sparkAggregation (request, df, builder);
-return prepare Response (request, builder, timer);
-SparkContextProvider.java
-}
-dfCacheManager.prepareHistoricalCacheRefresh
-(request);
-if (dfCacheManager.isDfCacheValid (request, builder)) {
-final Dataset<Row> df = dfCacheManager.getCachedDF to ProcessRequest (request);
-sparkAggregation (request, df, builder);
-}
-} catch (final Throwable throwable) {
-} else {
-return prepareResponse (request, builder, timer);
-}
-return prepareResponse (request, builder, timer);
-SparkDatarr
-builder.requestState (SparkJobRequestState.FAILED);
-Logger.warn("SparkBIFunction - Unable to process job-{}", request.getUniqueRequestId(), throwable);
+
 private boolean validateRequest(final SparkJobRequest req, final SparkJobResponse Builder responseBuilder) {
-boolean isValid = true;
-if (!allNotNull(req,
-req.getUniqueRequestId(), reg.getInputDataSource (),
-req.getOutputDataSource(), req.getCacheDfRequest Param())) {
-isValid = false;
-responseBuilder.requestState (SparkJobRequestState. REJECTED);
-responseBuilder.detailMessage("Unable to process request due to missing mandatory input");
-Logger.warn("Unable to process request due to missing mandatory inputs - {}", req);
+  boolean isValid = true;
+  if (!allNotNull(req,
+    req.getUniqueRequestId(), reg.getInputDataSource (),
+    req.getOutputDataSource(), req.getCacheDfRequest Param())) {
+    isValid = false;
+    responseBuilder.requestState (SparkJobRequestState. REJECTED);
+    responseBuilder.detailMessage("Unable to process request due to missing mandatory input");
+    logger.warn("Unable to process request due to missing mandatory inputs - {}", req);
+  }
+}
 
-SparkContextProvider java
-SparkDataFrameCacheManager.java
-© private void sparkAggregation (final SparkJobRequest request, final Dataset<Row> df, final SparkJobResponseBuilder sparkRespBuilder) {
-DataSource.java ⒸDfCacheData.java
-©
-Output
-final String uniqueRequestId = request.getUniqueRequestId();
-if (isNull(df)) {
-}
-return;
-sparkRespBuilder.requestState (SparkJobRequestState. REJECTED);
-sparkRespBuilder.detailMessage
-("Unable to process sparkAggregation for request as datafcame is null");
-Logger.info("Unable to process sparkAggregation for request id ) as dataframe is null. Request obj {}",
-uniqueRequestId, request);
-DfCacheSourceKey.java
-final SimpleTimerUtil timer = new Simple TimerUtil(logger);
-statePublisher.publishState (request, SparkJobRequestState.RUNNING);
-int requestCount = 0;
-Dataset sparkOutput = chainedAggregations (request, df, sparkRespBuilder, uniqueRequestId, timer, requestCount);
-if (isNotEmpty (request.getChainedRequests())) {
-}
-for (final SparkJobRequestr: request.getChainedRequests()) {
-sparkOutput = chainedAggregations (r, sparkOutput, sparkRespBuilder, uniqueRequestId, timer, ++requestCount);
-if (nonNull(sparkOutput)) {
-if (request.getLimit() != null) {
-sparkOutput = sparkOutput. limit (request.getLimit());
-}
-timer.LogEvent( eventName: "sparkAggregation-OrderByLimit", uniqueRequestId);
-dataSourceProvider.outgest(request, sparkOutput);
+private void sparkAggregation (final SparkJobRequest request, final Dataset<Row> df, final SparkJobResponseBuilder sparkRespBuilder) {
 
-ol Output
-if (request.isPopulateResponseStat()) {
-final long recordCount = sparkOutput.count();
-sparkRespBuilder.outputRecordCount (recordCount);
-sparkRespBuilder.outputColumns(sparkOutput.columns());
-Logger.info("Request id- {}, Aggregated report record count = {}",
-uniqueRequestId, recordCount);
-sparkRespBuilder.requestState (SparkJobRequestState.COMPLETED);
-if (request.getCacheDfRequest Param().isRefreshCache()
+  final String uniqueRequestId = request.getUniqueRequestId();
+  if (isNull(df)) {
+    sparkRespBuilder.requestState (SparkJobRequestState. REJECTED);
+    sparkRespBuilder.detailMessage
+    ("Unable to process sparkAggregation for request as datafcame is null");
+    Logger.info("Unable to process sparkAggregation for request id ) as dataframe is null. Request obj {}",
+    uniqueRequestId, request);
+    return;
+  }
+
+  final SimpleTimerUtil timer = new Simple TimerUtil(logger);
+  statePublisher.publishState (request, SparkJobRequestState.RUNNING);
+  int requestCount = 0;
+  Dataset sparkOutput = chainedAggregations (request, df, sparkRespBuilder, uniqueRequestId, timer, requestCount);
+  if (isNotEmpty (request.getChainedRequests())) {
+    for (final SparkJobRequestr: request.getChainedRequests()) {
+      sparkOutput = chainedAggregations (r, sparkOutput, sparkRespBuilder, uniqueRequestId, timer, ++requestCount);
+    }
+  }
+
+  if (nonNull(sparkOutput)) {
+    if (request.getLimit() != null) {
+      sparkOutput = sparkOutput. limit (request.getLimit());
+    }
+    timer.LogEvent( eventName: "sparkAggregation-OrderByLimit", uniqueRequestId);
+    dataSourceProvider.outgest(request, sparkOutput);
+
+    if (request.isPopulateResponseStat()) {
+      final long recordCount = sparkOutput.count();
+      sparkRespBuilder.outputRecordCount (recordCount);
+      sparkRespBuilder.outputColumns(sparkOutput.columns());
+      logger.info("Request id- {}, Aggregated report record count = {}",
+      uniqueRequestId, recordCount);
+    }
+    sparkRespBuilder.requestState (SparkJobRequestState.COMPLETED);
+    if (request.getCacheDfRequest Param().isRefreshCache()
+      || request.getCacheDfRequestParam().isDeltaRefreshCache()
+      || request.getCacheDfRequest Param().isForceRefreshCache()) {
+      dfCacheManager.updateCacheRefreshDate (request);
+    }
+  }
 }
-II
-II request.getCacheDfRequest Param().isForce RefreshCache()) {
-dfCacheManager.updateCacheRefreshDate (request);
-request.getCacheDfRequestParam().isDeltaRefreshCache()
+
 private Dataset chainedAggregations (final SparkJobRequest request, final Dataset<Row> dataset,
 final SparkJobResponseBuilder sparkRespBuilder, final String uniqueRequestId,
 final SimpleTimerUtil timer, final int requestCount) {
-final Dataset chainedDataset columnFilterParser.applyColumnFilters (request, dataset);
-Dataset sparkOutput;
-if (request.getMultiDimensionalAggParam() != null) {
-Logger.info("Going to apply MultiDimensional sparkAggregation for request_{} id- {}", requestCount,
-uniqueRequestId);
-sparkOutput = multiDimensionalAggFunction.aggregate (request, chained Dataset, sparkRespBuilder);
-} else {
-A ANTLR Preview
-Logger.info("Going to apply Default sparkAggregation for request_{} id- {}", request Count,
-A
-6
-sol Output
-}
-uniqueRequestId);
-sparkOutput = applyDefaultAggregation (request, chainedDataset, timer, sparkRespBuilder);
-if (nonNull(sparkOutput)) {
-final List<Column> cols=stream (sparkOutput.columns())
-map(functions::col)
-.collect(tolist());
-cols.add(lit(uniqueRequestId).as ("RequestId"));
-if (populateRowNum) {
-if (request.getBiRequest Params () != null
-&& isMISReportByStatus (request.getBiRequest Params ().getParams ())
-&& is NotEmpty (request.getCompositPrimaryKeyCols ())) {
-final Column rowNumCol = concat_ws(sep: "~", request
-}
-ANTIR Preview
-}
-} else {
--getCompositPrimaryKeyCols () List<String>
--stream() Stream <String>
-map(functions::col) Stream <Column>
-.toArray(Column []::new)).as ("rowNum");
-cols.add(rowNumCol);
-L↑
-if (isNotEmpty (request.getCompositPrimaryKeyCols())) {
-final Column pk = concat_ws( sep: "", request
-.getCompositPrimaryKeyCols () List<String>
-.stream() Stream <String>
-cols.add(monotonically increasing_id ().as ("rowNum"));
-9: Git
-.map(e
-.cast (DataTypes.StringType)) 
+  final Dataset chainedDataset columnFilterParser.applyColumnFilters (request, dataset);
+  Dataset sparkOutput;
+  if (request.getMultiDimensionalAggParam() != null) {
+    logger.info("Going to apply MultiDimensional sparkAggregation for request_{} id- {}", requestCount,
+    uniqueRequestId);
+    sparkOutput = multiDimensionalAggFunction.aggregate (request, chained Dataset, sparkRespBuilder);
+  } else {
+    logger.info("Going to apply Default sparkAggregation for request_{} id- {}", request Count,
+    uniqueRequestId);
+    sparkOutput = applyDefaultAggregation (request, chainedDataset, timer, sparkRespBuilder);
+  }
 
+  if (nonNull(sparkOutput)) {
+    final List<Column> cols=stream (sparkOutput.columns())
+      .map(functions::col)
+      .collect(tolist());
+    cols.add(lit(uniqueRequestId).as ("RequestId"));
+    if (populateRowNum) {
+      if (request.getBiRequest Params () != null
+        && isMISReportByStatus (request.getBiRequest Params ().getParams ())
+        && is NotEmpty (request.getCompositPrimaryKeyCols ())) {
+        final Column rowNumCol = concat_ws("~", request
+          .getCompositPrimaryKeyCols ()
+          .stream()
+          .map(functions::col)
+          .toArray(Column []::new)).as ("rowNum");
+        cols.add(rowNumCol);
+      } else {
+        cols.add(monotonically increasing_id ().as ("rowNum"));
+      }
+    }
+    if (isNotEmpty (request.getCompositPrimaryKeyCols())) {
+      final Column pk = concat_ws( "~", request
+        .getCompositPrimaryKeyCols ()
+        .stream()
+        .map(e
+        .cast (DataTypes.StringType)) 
+        .toArray(Column[]::new)).as (ROW_PRIMARY_KEY);
+      final Column pkNames= tit(String.join( delimiter: "", request.getCompositPrimaryKeyCots())).as (ROW_KEY_COLUMNS);
+      cols.add(pk);
+      cols.add(pkNames);
+    }
+
+    sparkOutput = sparkOutput.select(cols.toArray(new Column []{}));
+    timer.resetAndStart();
+    if (MapUtils.isNotEmpty (request.getOrderByColumns())) {
+      final List<Column> orderByList = new ArrayList<>();
+      for (final Map.Entry<String, SortOrder> e: request.getOrderByColumns ().entrySet()) {
+        final Column col = applySortOrder (e.getKey(), e.getValue());
+        orderByList.add(col);
+      }
+      sparkOutput = sparkOutput.orderBy(orderByList.toArray (new Column [request.getOrderByColumns ().size()]));
+    }
+  }
+  return sparkOutput;
 }
-}
-.toArray(Column[]::new)).as (ROW_PRIMARY_KEY);
-Final Column pkNames= tit(String.join( delimiter: "", request.getCompositPrimaryKeyCots())).as (ROW_KEY_COLUMNS);
-cols.add(pk);
-cols.add(pkNames);
-sparkOutput = sparkOutput.select(cols.toArray(new Column []{}));
-timer.resetAndStart();
-if (MapUtils.isNotEmpty (request.getOrderByColumns())) {
-final List<Column> orderByList = new ArrayList<>();
-for (final Map.Entry<String, SortOrder> e: request.getOrderByColumns ().entrySet()) {
-final Column col = applySortOrder (e.getKey(), e.getValue());
-orderByList.add(col);
-}
-sparkOutput = sparkOutput.orderBy(orderByList.toArray (new Column [request.getOrderByColumns ().size()]));
-return sparkOutput;
+
 private Column applySortOrder (final String key, final SortOrder sortorder) {
-final Column col = col(key);
-switch (sortOrder) {
-case ASC:
-return col.asc();
-case ABS_ASC:
-return abs(col).asc();
-G
+  final Column col = col(key);
+  switch (sortOrder) {
+    case ASC:
+      return col.asc();
+    case ABS_ASC:
+      return abs(col).asc();
+    case ABS_DESC:
+      return abs(col).desc();
+    default: //Default order is descending
+      return col.desc();
+  }
 }
-case ABS_DESC:
-return abs(col).desc();
-default: //Default order is descending
-return col.desc();
+
 private Dataset applyDefaultAggregation (final SparkJobRequest request, final Dataset<Row> df,
 final Simple TimerUtil timer, final SparkJobResponse Builder sparkRespBuilder) {
-Dataset sparkOutput = null;
-if (isNotEmpty (request.getGroupByColumns())) {
-final Column[] groupBy = request.getGroupBy Columns () List<String>
-.stream() Stream <String>
-.map (functions::col) Stream<Column>
-.toArray (Column[]::new);
-final List<Column> aggFunctions = aggregation Function (request);
-if (isNotEmpty(aggFunctions)) {
-final Column first = aggFunctions.get(0);
-SparkDataFrameCacheManager.java x
-if (aggFunctions.size() == 1) {
-sparkOutput= isNotEmpty (request.getPivotColumn())
-? df.groupBy (groupBy).pivot (request.getPivotColumn()) .agg (first)
-: df.groupBy (groupBy).agg (first);
-} else {
-Column[] aggArray = new Column [aggFunctions.size()-1];
-aggArray = aggFunctions, subList(1, aggFunctions.size()).toArray (aggArray);
+  Dataset sparkOutput = null;
+  if (isNotEmpty (request.getGroupByColumns())) {
+    final Column[] groupBy = request.getGroupBy Columns ()
+      .stream()
+      .map (functions::col)
+      .toArray (Column[]::new);
+    final List<Column> aggFunctions = aggregation Function (request);
+    if (isNotEmpty(aggFunctions)) {
+      final Column first = aggFunctions.get(0);
+ 
+      if (aggFunctions.size() == 1) {
+        sparkOutput= isNotEmpty (request.getPivotColumn())
+          ? df.groupBy (groupBy).pivot (request.getPivotColumn()) .agg (first)
+          : df.groupBy (groupBy).agg (first);
+      } else {
+        Column[] aggArray = new Column [aggFunctions.size()-1];
+        aggArray = aggFunctions, subList(1, aggFunctions.size()).toArray (aggArray);
 
+        sparkOutput = isNotEmpty (request.getPivotColumn())
+          ? df.groupBy (groupBy).pivot (request.getPivotColumn()).agg (first, aggArray)
+          : df.groupBy (groupBy).agg (first, aggArray);
+      }
+      timer.LogEvent( "sparkAggregation-GroupByPivot", request.getUnique RequestId());
+      timer.resetAndStart();
+      sparkOutput = applyAdditional Report Transformations (sparkOutput, request);
+      timer.logEvent( "sparkAggregation-Additional Transformations", request.getUniqueRequestId());
+    } else {
+      sparkRespBuilder.requestState (SparkJobRequestState.FAILED);
+      logger.warn("[SPARK: DEFINED_FUNCTION] Aggregations condition not provided. "
+      + "Ignoring Job request : { [ACTION: Please provide required parameters]", request.getUniqueRequestId());
+    }
+  } else {
+    sparkOutput = df;
+  }
+  return sparkOutput;
+}
 
-}
-}
-}
-} else {
-} else {
-}
-sparkOutput = isNotEmpty (request.getPivotColumn())
-? df.groupBy (groupBy).pivot (request.getPivotColumn()).agg (first, aggArray)
-: df.groupBy (groupBy).agg (first, aggArray);
-timer.LogEvent( eventName: "sparkAggregation-GroupByPivot", request.getUnique RequestId());
-timer.resetAndStart();
-sparkOutput = applyAdditional Report Transformations (sparkOutput, request);
-timer.logEvent( eventName: "sparkAggregation-Additional Transformations", request.getUniqueRequestId());
-sparkOutput = df;
-return sparkOutput;
-ovider.java
-sparkRespBuilder.requestState (SparkJobRequestState.FAILED);
-Logger.warn("[SPARK: DEFINED_FUNCTION] Aggregations condition not provided. "
-+ "Ignoring Job request : { [ACTION: Please provide required parameters]", request.getUniqueRequestId());
 private List<Column> aggregationFunction (final SparkJobRequest request) {
-final List<SparkAggregation> requestAggregations = request.getAggregations();
-if (isNotEmpty (requestAggregations)) {
-return getSparkAggExpr (requestAggregations, logger);
-} else {
-return null;
-}
+  final List<SparkAggregation> requestAggregations = request.getAggregations();
+  if (isNotEmpty (requestAggregations)) {
+    return getSparkAggExpr (requestAggregations, logger);
+  } else {
+    return null;
+  }
 }
 
