@@ -1,4 +1,12 @@
 
+public enum DataSourceParamKey {
+OUTPUT_DB_NAME,
+OUTPUT_COLLECTION_NAME,
+OUTPUT SOLACE_RESP_TYPE,
+INPUT_DB_NAME,
+INPUT_COLLECTION_NAME;
+private DataSourceParamKey () {
+}
 import com.google.inject. Inject;
 import com.scb.cat.common.logging. LoggerFactory;
 import com.scb.cat.core.timer.SimpleTimerUtil;
@@ -469,3 +477,13 @@ private Map<DataSourceParamKey, String> dataSourceConfig;
 }
 
 ////////////
+
+public enum DataSourceParamKey {
+OUTPUT_DB_NAME,
+OUTPUT_COLLECTION_NAME,
+OUTPUT SOLACE_RESP_TYPE,
+INPUT_DB_NAME,
+INPUT_COLLECTION_NAME;
+private DataSourceParamKey () {
+}
+}
