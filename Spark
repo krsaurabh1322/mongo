@@ -437,30 +437,26 @@ public class SparkJobRequest implements Routeable, Serializable {
   private Integer limit;
   private CacheDfRequest Param cacheDfRequestParam;
   private MultiDimensionalPivotParam multiDimensionalAggParam;
+  private List<SparkJobRequest> chainedRequests;
 }
-private List<SparkJobRequest> chainedRequests;
-
 
 ///////////
 
 public class SparkAggregation implements Serializable {
-aggregation Function;
-private AggregationFunction
-private String column;
-private String columnAlias;
+  private AggregationFunction aggregationFunction;
+  private String column;
+  private String columnAlias;
 }
 
 ///////////
 
-
-
 public enum AggregationFunction {
-SUM,
-ABS_SUM,
-MIN,
-MAX,
-AVG,
-COUNT;
-private AggregationFunction () {
-}
+  SUM,
+  ABS_SUM,
+  MIN,
+  MAX,
+  AVG,
+  COUNT;
+  private AggregationFunction () {
+  }
 }
