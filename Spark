@@ -412,3 +412,29 @@ public class SparkBIFunction implements SparkJobFunction<SparkJobRequest, SparkJ
     }
   }
 }
+
+
+////////////
+
+public class SparkJobRequest implements Routeable, Serializable {
+private String uniqueRequestId;
+private String parentReportId;
+private String requestedBy;
+private String sparkFunction;
+private String jobName;
+private SparkDataSourceConfig inputDataSource;
+private SparkDataSourceConfig outputDataSource;
+private List<String> groupByColumns;
+private List<String> compositPrimaryKeyCols;
+private String pivotColumn;
+private String queryFilter;
+private ChainedColumnFilters columnFilters;
+private Map<Pair<String, String>, Object> mandatoryDfColumns;
+private boolean populateResponseStat;
+private List<SparkAggregation> aggregations;
+private SparkBIRequestParams biRequestParams;
+private Map<String, SortOrder> orderByColumns;
+private Integer limit;
+private CacheDfRequest Param cacheDfRequestParam;
+private MultiDimensionalPivotParam multiDimensionalAggParam;
+private List<SparkJobRequest> chainedRequests;
