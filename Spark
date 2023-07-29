@@ -188,227 +188,227 @@ public class SparkBIFunction implements SparkJobFunction<SparkJobRequest, SparkJ
 
   public static String getFunctionName() { return SparkBIFunction.class.getSimpleName(); }
 
-@Override
-public SparkJobResponse apply(final SparkJobRequest request) {
-
-  final SparkJobResponseBuilder builder = SparkJobResponse.builder()
-  .original Request (request)
-  .uniqueRequestId(request.getUniqueRequestId())
-  //Normally primary ReportId is same as reportId.
-  //It differs when one UI report is computed using multiple Spark Job requests and joined on UI for presentation.
-  .parentReportId (request.getParent ReportId() != null
-  ? request.getParentReportId()
-  : request.getUniqueRequestId());
+  @Override
+  public SparkJobResponse apply(final SparkJobRequest request) {
   
-  logger.info("Thread - Solace channel {}- SparkBIFunction Processing Spark Job request - {}",
-  currentThread().getName(), channelForSparkCore (), request.getUniqueRequestId());
-
-  final SimpleTimerUtil timer = new Simple TimerUtil(logger);|
-  try {
-    if (!validateRequest (request, builder)) {
-      return prepareResponse (request, builder, timer);
+    final SparkJobResponseBuilder builder = SparkJobResponse.builder()
+    .original Request (request)
+    .uniqueRequestId(request.getUniqueRequestId())
+    //Normally primary ReportId is same as reportId.
+    //It differs when one UI report is computed using multiple Spark Job requests and joined on UI for presentation.
+    .parentReportId (request.getParent ReportId() != null
+    ? request.getParentReportId()
+    : request.getUniqueRequestId());
+    
+    logger.info("Thread - Solace channel {}- SparkBIFunction Processing Spark Job request - {}",
+    currentThread().getName(), channelForSparkCore (), request.getUniqueRequestId());
+  
+    final SimpleTimerUtil timer = new Simple TimerUtil(logger);|
+    try {
+      if (!validateRequest (request, builder)) {
+        return prepareResponse (request, builder, timer);
+      }
+      if (request.getCacheDfRequest Param().isRefresh IntradayCache()) {
+        final Dataset<Row> df = dfCacheManager.doIntraDayCache Refresh (request, builder);
+        sparkAggregation (request, df, builder);
+        return prepareResponse (request, builder, timer);
+      }
+      if (request.getCacheDfRequest Param().isDeltaRefreshCache()) {
+        final Dataset<Row> df = dfCacheManager.doDeltaCache Refresh (request, builder);
+        sparkAggregation (request, df, builder);
+        return prepare Response (request, builder, timer);
+      }
+    
+      dfCacheManager.prepareHistoricalCacheRefresh(request);
+      if (dfCacheManager.isDfCacheValid (request, builder)) {
+        final Dataset<Row> df = dfCacheManager.getCachedDF to ProcessRequest (request);
+        sparkAggregation (request, df, builder);
+      } else {
+        return prepareResponse (request, builder, timer);
+      }
+    } catch (final Throwable throwable) {
+      builder.requestState (SparkJobRequestState.FAILED);
+      logger.warn("SparkBIFunction - Unable to process job-{}", request.getUniqueRequestId(), throwable);
     }
-    if (request.getCacheDfRequest Param().isRefresh IntradayCache()) {
-      final Dataset<Row> df = dfCacheManager.doIntraDayCache Refresh (request, builder);
-      sparkAggregation (request, df, builder);
-      return prepareResponse (request, builder, timer);
+    return prepareResponse (request, builder, timer);
+  }
+  
+  private boolean validateRequest(final SparkJobRequest req, final SparkJobResponse Builder responseBuilder) {
+    boolean isValid = true;
+    if (!allNotNull(req,
+      req.getUniqueRequestId(), reg.getInputDataSource (),
+      req.getOutputDataSource(), req.getCacheDfRequest Param())) {
+      isValid = false;
+      responseBuilder.requestState (SparkJobRequestState. REJECTED);
+      responseBuilder.detailMessage("Unable to process request due to missing mandatory input");
+      logger.warn("Unable to process request due to missing mandatory inputs - {}", req);
     }
-    if (request.getCacheDfRequest Param().isDeltaRefreshCache()) {
-      final Dataset<Row> df = dfCacheManager.doDeltaCache Refresh (request, builder);
-      sparkAggregation (request, df, builder);
-      return prepare Response (request, builder, timer);
+  }
+  
+  private void sparkAggregation (final SparkJobRequest request, final Dataset<Row> df, final SparkJobResponseBuilder sparkRespBuilder) {
+  
+    final String uniqueRequestId = request.getUniqueRequestId();
+    if (isNull(df)) {
+      sparkRespBuilder.requestState (SparkJobRequestState. REJECTED);
+      sparkRespBuilder.detailMessage
+      ("Unable to process sparkAggregation for request as datafcame is null");
+      Logger.info("Unable to process sparkAggregation for request id ) as dataframe is null. Request obj {}",
+      uniqueRequestId, request);
+      return;
     }
   
-    dfCacheManager.prepareHistoricalCacheRefresh(request);
-    if (dfCacheManager.isDfCacheValid (request, builder)) {
-      final Dataset<Row> df = dfCacheManager.getCachedDF to ProcessRequest (request);
-      sparkAggregation (request, df, builder);
+    final SimpleTimerUtil timer = new Simple TimerUtil(logger);
+    statePublisher.publishState (request, SparkJobRequestState.RUNNING);
+    int requestCount = 0;
+    Dataset sparkOutput = chainedAggregations (request, df, sparkRespBuilder, uniqueRequestId, timer, requestCount);
+    if (isNotEmpty (request.getChainedRequests())) {
+      for (final SparkJobRequestr: request.getChainedRequests()) {
+        sparkOutput = chainedAggregations (r, sparkOutput, sparkRespBuilder, uniqueRequestId, timer, ++requestCount);
+      }
+    }
+  
+    if (nonNull(sparkOutput)) {
+      if (request.getLimit() != null) {
+        sparkOutput = sparkOutput. limit (request.getLimit());
+      }
+      timer.LogEvent( eventName: "sparkAggregation-OrderByLimit", uniqueRequestId);
+      dataSourceProvider.outgest(request, sparkOutput);
+  
+      if (request.isPopulateResponseStat()) {
+        final long recordCount = sparkOutput.count();
+        sparkRespBuilder.outputRecordCount (recordCount);
+        sparkRespBuilder.outputColumns(sparkOutput.columns());
+        logger.info("Request id- {}, Aggregated report record count = {}",
+        uniqueRequestId, recordCount);
+      }
+      sparkRespBuilder.requestState (SparkJobRequestState.COMPLETED);
+      if (request.getCacheDfRequest Param().isRefreshCache()
+        || request.getCacheDfRequestParam().isDeltaRefreshCache()
+        || request.getCacheDfRequest Param().isForceRefreshCache()) {
+        dfCacheManager.updateCacheRefreshDate (request);
+      }
+    }
+  }
+  
+  private Dataset chainedAggregations (final SparkJobRequest request, final Dataset<Row> dataset,
+  final SparkJobResponseBuilder sparkRespBuilder, final String uniqueRequestId,
+  final SimpleTimerUtil timer, final int requestCount) {
+    final Dataset chainedDataset columnFilterParser.applyColumnFilters (request, dataset);
+    Dataset sparkOutput;
+    if (request.getMultiDimensionalAggParam() != null) {
+      logger.info("Going to apply MultiDimensional sparkAggregation for request_{} id- {}", requestCount,
+      uniqueRequestId);
+      sparkOutput = multiDimensionalAggFunction.aggregate (request, chained Dataset, sparkRespBuilder);
     } else {
-      return prepareResponse (request, builder, timer);
+      logger.info("Going to apply Default sparkAggregation for request_{} id- {}", request Count,
+      uniqueRequestId);
+      sparkOutput = applyDefaultAggregation (request, chainedDataset, timer, sparkRespBuilder);
     }
-  } catch (final Throwable throwable) {
-    builder.requestState (SparkJobRequestState.FAILED);
-    logger.warn("SparkBIFunction - Unable to process job-{}", request.getUniqueRequestId(), throwable);
-  }
-  return prepareResponse (request, builder, timer);
-}
-
-private boolean validateRequest(final SparkJobRequest req, final SparkJobResponse Builder responseBuilder) {
-  boolean isValid = true;
-  if (!allNotNull(req,
-    req.getUniqueRequestId(), reg.getInputDataSource (),
-    req.getOutputDataSource(), req.getCacheDfRequest Param())) {
-    isValid = false;
-    responseBuilder.requestState (SparkJobRequestState. REJECTED);
-    responseBuilder.detailMessage("Unable to process request due to missing mandatory input");
-    logger.warn("Unable to process request due to missing mandatory inputs - {}", req);
-  }
-}
-
-private void sparkAggregation (final SparkJobRequest request, final Dataset<Row> df, final SparkJobResponseBuilder sparkRespBuilder) {
-
-  final String uniqueRequestId = request.getUniqueRequestId();
-  if (isNull(df)) {
-    sparkRespBuilder.requestState (SparkJobRequestState. REJECTED);
-    sparkRespBuilder.detailMessage
-    ("Unable to process sparkAggregation for request as datafcame is null");
-    Logger.info("Unable to process sparkAggregation for request id ) as dataframe is null. Request obj {}",
-    uniqueRequestId, request);
-    return;
-  }
-
-  final SimpleTimerUtil timer = new Simple TimerUtil(logger);
-  statePublisher.publishState (request, SparkJobRequestState.RUNNING);
-  int requestCount = 0;
-  Dataset sparkOutput = chainedAggregations (request, df, sparkRespBuilder, uniqueRequestId, timer, requestCount);
-  if (isNotEmpty (request.getChainedRequests())) {
-    for (final SparkJobRequestr: request.getChainedRequests()) {
-      sparkOutput = chainedAggregations (r, sparkOutput, sparkRespBuilder, uniqueRequestId, timer, ++requestCount);
-    }
-  }
-
-  if (nonNull(sparkOutput)) {
-    if (request.getLimit() != null) {
-      sparkOutput = sparkOutput. limit (request.getLimit());
-    }
-    timer.LogEvent( eventName: "sparkAggregation-OrderByLimit", uniqueRequestId);
-    dataSourceProvider.outgest(request, sparkOutput);
-
-    if (request.isPopulateResponseStat()) {
-      final long recordCount = sparkOutput.count();
-      sparkRespBuilder.outputRecordCount (recordCount);
-      sparkRespBuilder.outputColumns(sparkOutput.columns());
-      logger.info("Request id- {}, Aggregated report record count = {}",
-      uniqueRequestId, recordCount);
-    }
-    sparkRespBuilder.requestState (SparkJobRequestState.COMPLETED);
-    if (request.getCacheDfRequest Param().isRefreshCache()
-      || request.getCacheDfRequestParam().isDeltaRefreshCache()
-      || request.getCacheDfRequest Param().isForceRefreshCache()) {
-      dfCacheManager.updateCacheRefreshDate (request);
-    }
-  }
-}
-
-private Dataset chainedAggregations (final SparkJobRequest request, final Dataset<Row> dataset,
-final SparkJobResponseBuilder sparkRespBuilder, final String uniqueRequestId,
-final SimpleTimerUtil timer, final int requestCount) {
-  final Dataset chainedDataset columnFilterParser.applyColumnFilters (request, dataset);
-  Dataset sparkOutput;
-  if (request.getMultiDimensionalAggParam() != null) {
-    logger.info("Going to apply MultiDimensional sparkAggregation for request_{} id- {}", requestCount,
-    uniqueRequestId);
-    sparkOutput = multiDimensionalAggFunction.aggregate (request, chained Dataset, sparkRespBuilder);
-  } else {
-    logger.info("Going to apply Default sparkAggregation for request_{} id- {}", request Count,
-    uniqueRequestId);
-    sparkOutput = applyDefaultAggregation (request, chainedDataset, timer, sparkRespBuilder);
-  }
-
-  if (nonNull(sparkOutput)) {
-    final List<Column> cols=stream (sparkOutput.columns())
-      .map(functions::col)
-      .collect(tolist());
-    cols.add(lit(uniqueRequestId).as ("RequestId"));
-    if (populateRowNum) {
-      if (request.getBiRequest Params () != null
-        && isMISReportByStatus (request.getBiRequest Params ().getParams ())
-        && is NotEmpty (request.getCompositPrimaryKeyCols ())) {
-        final Column rowNumCol = concat_ws("~", request
+  
+    if (nonNull(sparkOutput)) {
+      final List<Column> cols=stream (sparkOutput.columns())
+        .map(functions::col)
+        .collect(tolist());
+      cols.add(lit(uniqueRequestId).as ("RequestId"));
+      if (populateRowNum) {
+        if (request.getBiRequest Params () != null
+          && isMISReportByStatus (request.getBiRequest Params ().getParams ())
+          && is NotEmpty (request.getCompositPrimaryKeyCols ())) {
+          final Column rowNumCol = concat_ws("~", request
+            .getCompositPrimaryKeyCols ()
+            .stream()
+            .map(functions::col)
+            .toArray(Column []::new)).as ("rowNum");
+          cols.add(rowNumCol);
+        } else {
+          cols.add(monotonically increasing_id ().as ("rowNum"));
+        }
+      }
+      if (isNotEmpty (request.getCompositPrimaryKeyCols())) {
+        final Column pk = concat_ws( "~", request
           .getCompositPrimaryKeyCols ()
           .stream()
-          .map(functions::col)
-          .toArray(Column []::new)).as ("rowNum");
-        cols.add(rowNumCol);
-      } else {
-        cols.add(monotonically increasing_id ().as ("rowNum"));
+          .map(e
+          .cast (DataTypes.StringType)) 
+          .toArray(Column[]::new)).as (ROW_PRIMARY_KEY);
+        final Column pkNames= tit(String.join( delimiter: "", request.getCompositPrimaryKeyCots())).as (ROW_KEY_COLUMNS);
+        cols.add(pk);
+        cols.add(pkNames);
       }
-    }
-    if (isNotEmpty (request.getCompositPrimaryKeyCols())) {
-      final Column pk = concat_ws( "~", request
-        .getCompositPrimaryKeyCols ()
-        .stream()
-        .map(e
-        .cast (DataTypes.StringType)) 
-        .toArray(Column[]::new)).as (ROW_PRIMARY_KEY);
-      final Column pkNames= tit(String.join( delimiter: "", request.getCompositPrimaryKeyCots())).as (ROW_KEY_COLUMNS);
-      cols.add(pk);
-      cols.add(pkNames);
-    }
-
-    sparkOutput = sparkOutput.select(cols.toArray(new Column []{}));
-    timer.resetAndStart();
-    if (MapUtils.isNotEmpty (request.getOrderByColumns())) {
-      final List<Column> orderByList = new ArrayList<>();
-      for (final Map.Entry<String, SortOrder> e: request.getOrderByColumns ().entrySet()) {
-        final Column col = applySortOrder (e.getKey(), e.getValue());
-        orderByList.add(col);
-      }
-      sparkOutput = sparkOutput.orderBy(orderByList.toArray (new Column [request.getOrderByColumns ().size()]));
-    }
-  }
-  return sparkOutput;
-}
-
-private Column applySortOrder (final String key, final SortOrder sortorder) {
-  final Column col = col(key);
-  switch (sortOrder) {
-    case ASC:
-      return col.asc();
-    case ABS_ASC:
-      return abs(col).asc();
-    case ABS_DESC:
-      return abs(col).desc();
-    default: //Default order is descending
-      return col.desc();
-  }
-}
-
-private Dataset applyDefaultAggregation (final SparkJobRequest request, final Dataset<Row> df,
-final Simple TimerUtil timer, final SparkJobResponse Builder sparkRespBuilder) {
-  Dataset sparkOutput = null;
-  if (isNotEmpty (request.getGroupByColumns())) {
-    final Column[] groupBy = request.getGroupBy Columns ()
-      .stream()
-      .map (functions::col)
-      .toArray (Column[]::new);
-    final List<Column> aggFunctions = aggregation Function (request);
-    if (isNotEmpty(aggFunctions)) {
-      final Column first = aggFunctions.get(0);
- 
-      if (aggFunctions.size() == 1) {
-        sparkOutput= isNotEmpty (request.getPivotColumn())
-          ? df.groupBy (groupBy).pivot (request.getPivotColumn()) .agg (first)
-          : df.groupBy (groupBy).agg (first);
-      } else {
-        Column[] aggArray = new Column [aggFunctions.size()-1];
-        aggArray = aggFunctions, subList(1, aggFunctions.size()).toArray (aggArray);
-
-        sparkOutput = isNotEmpty (request.getPivotColumn())
-          ? df.groupBy (groupBy).pivot (request.getPivotColumn()).agg (first, aggArray)
-          : df.groupBy (groupBy).agg (first, aggArray);
-      }
-      timer.LogEvent( "sparkAggregation-GroupByPivot", request.getUnique RequestId());
+  
+      sparkOutput = sparkOutput.select(cols.toArray(new Column []{}));
       timer.resetAndStart();
-      sparkOutput = applyAdditional Report Transformations (sparkOutput, request);
-      timer.logEvent( "sparkAggregation-Additional Transformations", request.getUniqueRequestId());
-    } else {
-      sparkRespBuilder.requestState (SparkJobRequestState.FAILED);
-      logger.warn("[SPARK: DEFINED_FUNCTION] Aggregations condition not provided. "
-      + "Ignoring Job request : { [ACTION: Please provide required parameters]", request.getUniqueRequestId());
+      if (MapUtils.isNotEmpty (request.getOrderByColumns())) {
+        final List<Column> orderByList = new ArrayList<>();
+        for (final Map.Entry<String, SortOrder> e: request.getOrderByColumns ().entrySet()) {
+          final Column col = applySortOrder (e.getKey(), e.getValue());
+          orderByList.add(col);
+        }
+        sparkOutput = sparkOutput.orderBy(orderByList.toArray (new Column [request.getOrderByColumns ().size()]));
+      }
     }
-  } else {
-    sparkOutput = df;
+    return sparkOutput;
   }
-  return sparkOutput;
-}
-
-private List<Column> aggregationFunction (final SparkJobRequest request) {
-  final List<SparkAggregation> requestAggregations = request.getAggregations();
-  if (isNotEmpty (requestAggregations)) {
-    return getSparkAggExpr (requestAggregations, logger);
-  } else {
-    return null;
+  
+  private Column applySortOrder (final String key, final SortOrder sortorder) {
+    final Column col = col(key);
+    switch (sortOrder) {
+      case ASC:
+        return col.asc();
+      case ABS_ASC:
+        return abs(col).asc();
+      case ABS_DESC:
+        return abs(col).desc();
+      default: //Default order is descending
+        return col.desc();
+    }
+  }
+  
+  private Dataset applyDefaultAggregation (final SparkJobRequest request, final Dataset<Row> df,
+  final Simple TimerUtil timer, final SparkJobResponse Builder sparkRespBuilder) {
+    Dataset sparkOutput = null;
+    if (isNotEmpty (request.getGroupByColumns())) {
+      final Column[] groupBy = request.getGroupBy Columns ()
+        .stream()
+        .map (functions::col)
+        .toArray (Column[]::new);
+      final List<Column> aggFunctions = aggregation Function (request);
+      if (isNotEmpty(aggFunctions)) {
+        final Column first = aggFunctions.get(0);
+   
+        if (aggFunctions.size() == 1) {
+          sparkOutput= isNotEmpty (request.getPivotColumn())
+            ? df.groupBy (groupBy).pivot (request.getPivotColumn()) .agg (first)
+            : df.groupBy (groupBy).agg (first);
+        } else {
+          Column[] aggArray = new Column [aggFunctions.size()-1];
+          aggArray = aggFunctions, subList(1, aggFunctions.size()).toArray (aggArray);
+  
+          sparkOutput = isNotEmpty (request.getPivotColumn())
+            ? df.groupBy (groupBy).pivot (request.getPivotColumn()).agg (first, aggArray)
+            : df.groupBy (groupBy).agg (first, aggArray);
+        }
+        timer.LogEvent( "sparkAggregation-GroupByPivot", request.getUnique RequestId());
+        timer.resetAndStart();
+        sparkOutput = applyAdditional Report Transformations (sparkOutput, request);
+        timer.logEvent( "sparkAggregation-Additional Transformations", request.getUniqueRequestId());
+      } else {
+        sparkRespBuilder.requestState (SparkJobRequestState.FAILED);
+        logger.warn("[SPARK: DEFINED_FUNCTION] Aggregations condition not provided. "
+        + "Ignoring Job request : { [ACTION: Please provide required parameters]", request.getUniqueRequestId());
+      }
+    } else {
+      sparkOutput = df;
+    }
+    return sparkOutput;
+  }
+  
+  private List<Column> aggregationFunction (final SparkJobRequest request) {
+    final List<SparkAggregation> requestAggregations = request.getAggregations();
+    if (isNotEmpty (requestAggregations)) {
+      return getSparkAggExpr (requestAggregations, logger);
+    } else {
+      return null;
+    }
   }
 }
-
