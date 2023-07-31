@@ -543,3 +543,39 @@ for doc in collection.find():
     new_date_iso = parse(old_date_str)  # Use dateutil.parser to convert the string to ISODate
     collection.update_one({"_id": doc["_id"]}, {"$set": {"your_field": new_date_iso}})
 
+
+////////
+
+
+
+// Connect to your MongoDB server
+const MongoClient = require('mongodb').MongoClient;
+const url = 'mongodb://localhost:27017';
+const dbName = 'your_database';
+const collectionName = 'your_collection';
+
+MongoClient.connect(url, { useUnifiedTopology: true }, function(err, client) {
+  if (err) {
+    console.error('Error connecting to MongoDB:', err);
+    return;
+  }
+
+  const db = client.db(dbName);
+  const collection = db.collection(collectionName);
+
+  // Step 1: Convert the integer field to a string field
+  collection.find().forEach(function(doc) {
+    const oldIntValue = doc.yourField; // Replace "yourField" with your actual field name
+    const newStrValue = oldIntValue.toString();
+    collection.updateOne({ _id: doc._id }, { $set: { yourField: newStrValue } });
+  });
+
+  // Step 2: Convert the string field to an ISODate field
+  collection.find().forEach(function(doc) {
+    const oldDateStr = doc.yourField; // Replace "yourField" with your actual field name
+    const newDateISO = new Date(oldDateStr);
+    collection.updateOne({ _id: doc._id }, { $set: { yourField: newDateISO } });
+  });
+
+  client.close();
+});
