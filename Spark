@@ -1,4 +1,4 @@
-
+se
 public enum DataSourceParamKey {
 OUTPUT_DB_NAME,
 OUTPUT_COLLECTION_NAME,
@@ -519,3 +519,27 @@ for doc in collection.find():
 
 # Step 3: Optionally, remove the old field
 collection.update_many({}, {"$unset": {"old_column_name": ""}})
+
+///////
+
+
+import pymongo
+from dateutil.parser import parse
+
+# Connect to your MongoDB server
+client = pymongo.MongoClient("mongodb://localhost:27017")
+db = client["your_database"]
+collection = db["your_collection"]
+
+# Step 1: Convert the integer field to a string field
+for doc in collection.find():
+    old_int_value = doc["your_field"]  # Replace "your_field" with your actual field name
+    new_str_value = str(old_int_value)
+    collection.update_one({"_id": doc["_id"]}, {"$set": {"your_field": new_str_value}})
+
+# Step 2: Convert the string field to an ISODate field
+for doc in collection.find():
+    old_date_str = doc["your_field"]  # Replace "your_field" with your actual field name
+    new_date_iso = parse(old_date_str)  # Use dateutil.parser to convert the string to ISODate
+    collection.update_one({"_id": doc["_id"]}, {"$set": {"your_field": new_date_iso}})
+
