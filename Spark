@@ -1,4 +1,14 @@
-se
+
+
+
+
+// Assuming you are using the MongoDB shell
+db.sourceCollection.aggregate([
+  { $match: {} }, // Optionally, you can use a $match stage to filter data
+  { $out: "destinationCollection" }
+]);
+
+
 public enum DataSourceParamKey {
 OUTPUT_DB_NAME,
 OUTPUT_COLLECTION_NAME,
