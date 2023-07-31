@@ -487,3 +487,14 @@ INPUT_COLLECTION_NAME;
 private DataSourceParamKey () {
 }
 }
+
+//////////
+
+db.collection.updateMany(
+  {},
+  [
+    { $set: { newStrField: { $toString: "$intField" } } }, // Convert int to string
+    { $set: { newDateField: { $toDate: "$strField" } } }, // Convert string to ISODate
+    { $unset: ["intField", "strField"] } // Remove the old fields after conversion
+  ]
+);
