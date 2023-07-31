@@ -498,3 +498,24 @@ db.collection.updateMany(
     { $unset: ["intField", "strField"] } // Remove the old fields after conversion
   ]
 );
+//////////////
+
+
+import pymongo
+
+# Connect to your MongoDB server
+client = pymongo.MongoClient("mongodb://localhost:27017")
+db = client["your_database"]
+collection = db["your_collection"]
+
+# Step 1: Add a new field with the desired data type
+collection.update_many({}, {"$set": {"new_column_name": ""}})
+
+# Step 2: Loop through each document and copy the value, converting it to a string
+for doc in collection.find():
+    old_value = doc["old_column_name"]
+    new_value = str(old_value)
+    collection.update_one({"_id": doc["_id"]}, {"$set": {"new_column_name": new_value}})
+
+# Step 3: Optionally, remove the old field
+collection.update_many({}, {"$unset": {"old_column_name": ""}})
