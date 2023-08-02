@@ -390,3 +390,143 @@ return dfoutput.groupBy (gpCols).pivot (col (p.getPivotColName()));
 }
 
 
+
+
+private static Column[] sparkGroupCols (final SparkPivotParam pivotParam) (
+final int size = pivotParam.getGroupByCols ().size();
+return pivotParam.getGroupByCols().stream().map (functions::col).collect(Collectors.toList()).toArray (new Column[size]);
+}
+private static Dataset<Row> renameColumns (Map<String, String> renameCols, Dataset<Row> inputDf) {
+if (ObjectUtils.isNotEmpty (renameCols)) {
+final List<String> existingDfCols = Arrays.asList (inputDf.columns());
+for (final Map.Entry<String, String> e: renameCols.entrySet()) {
+if (!existingDfCols.contains (e.getKey())) {
+inputDf = inputDf.withColumn (e.getKey(), lit( literal: 0));
+inputDf inputDf.withColumnRenamed (e.getKey(), e.getValue());
+}
+return inputDf;
+private static Dataset<Row> applyBiRowAggregation Transformation (final SparkJobRequest request, Dataset<Row> inputDf, final List<String> addCols, final Config config){
+if (ObjectUtils.isNotEmpty(addCols)) {
+I
+final List<String> existingDfCols = Arrays.asList (inputDf.columns());
+Column firstCol = null;
+final List<Column> aggRows = new ArrayList<> ();
+for (final String column: addCols) {
+if (existingDfCols.contains (column)) {
+if (firstCol == null) {
+firstcol = sum(col(column)).as (column);
+aggRows.add(sum(col(column)).as (column));
+} else {
+
+
+
+if (firstCol == null) {
+return inputDf;
+}
+aggRows.add(sum (col(column)).as (column));
+final Column[] aggRowsArr = new Column [aggRows.size()];
+aggRows.toArray(aggRows Arr);
+final SparkBIRequest Params biRequest Params = request.getBiRequestParams ();
+if ("AttVsEx".equals (biRequestParams.getAnalysis Type())) {
+}
+MisDashBoardSparkQuery.java
+final String[] executedArr = getStatus ExecutedValues (config);
+inputDf = inputDf.groupBy (when (col (STATUS).isin (executedArr), value: "Executed")
+.otherwise("Attempted")
+.as (STATUS))
+agg (firstCol, aggRowsArr);
+} else if ("VoiceVsECom".equals (biRequest Params.getAnalysis Type())) {
+inputDf applyVoice VsEComTransformation (request, inputDf, first Col, aggRowsArr);
+return inputDf;
+MultiDimensional PivotParam.class x
+SparkBIFunction.java
+private static Dataset<Row> applyVoiceVsEComTransformation (final SparkJobRequest request, Dataset<Row> input f. final Column firstAggCol, final Column[] aggRowsArr){
+final List<String> groupByStringColumns = request.getMultiDimensionalAggParam().getPivots().get().getGroupByCols():
+final List<Column> groupByColumns = new ArrayList();
+
+
+
+
+
+
+final Column eComVoiceGroupByColumn= when (col(SOURCE).isin ("VOICE"), value: "VOICE")
+.otherwise ("ECom")
+.as (SOURCE);
+groupByColumns.add(eComVoiceGroupByColumn);
+// get the remaining groupBy columns
+if (groupByString Columns.size() > 1) {
+groupByString Columns.stream()
+}
+.filter(col->SOURCE.equalsIgnoreCase (col))
+.forEach(string Col groupByColumns.add(col (string Col)));
+inputDf inputDf.groupBy (groupByColumns.toArray (new Column [0])).
+.agg (firstAggCol, aggRowsArr);
+return inputDf;
+static Dataset<Row> additionalAggColumns (final Map<String, List<String>> addCols, Dataset<Row> inputDf) {
+if (ObjectUtils.isNotEmpty (addCols)) {
+final Set<String> existingDfCols = new HashSet<> (Arrays.asList (inputDf.columns()));
+for (final Map.Entry<String, List<String>> e: addCols.entrySet()) {
+if (CollectionUtils.isNotEmpty(e.getValue())) {
+Column aggColl = null;
+for (final String coll: e.getValue()) {
+if (existingDfCols.contains (coll)) {
+if (aggColl == null) {
+aggColl col(coll);
+MisDashBoardSparkQuery.java x MultiDimensional PivotParam.clas
+} else {
+}
+aggColl = aggColl.plus (col (coll));}
+
+
+
+
+}
+}
+if (aggColl != null) {
+inputDf = inputDf.withColumn (e.getKey(), aggColl);
+} else {
+inputDf inputDf.withColumn (e.getKey(), lit(literal: 0));
+}
+existingDfCols.add(e.getKey());
+} else {
+inputDf inputDf.withColumn (e.getKey(), lit (literal: 0));
+}
+return inputDf;
+ANTIR Preview
+private Dataset<Row> calculateHmRatioColumns (String requestId,
+if (ObjectUtils.isNotEmpty (hmRatioColumns)) {
+for (Map.Entry<String, Pair<String, String>>e: hmRatioColumns.entrySet()) {
+if (StringUtils.isNotEmpty(e.getKey()) && Objects.nonNull(e.getValue())) {
+String numerator = e.getValue().getLeft();
+String denominator = e.getValue().getRight();
+Map<String, Pair<String, String>> hmRatio Columns, Dataset<Row> inputDf) {
+} else {
+4
+inputDf = inputDf.withColumn (e.getKey(),
+when(col(denominator).gt (lit( literal: 0)), col (numerator). divide (col (denominator))).otherwise (lit( literal: e)));
+Logger.warn("Request Id- {}, key (), Invalid param for HmRatio calculation.", requestId, e.getKey());
+}
+
+
+
+
+public Dataset<Row> addMandatoryColumnWithConstantValue (Dataset<Row> sparkDs, SparkJobRequest req) {
+Map<Pair<String, String>, Object> mandatoryCol = req.getMandatoryDfColumns();
+if (MapUtils.isNotEmpty (mandatoryCol)) {
+}
+List<String> existingDfCols = Arrays.asList(sparkDs.columns());
+for (Map.Entry<Pair<String, String>, Object> e mandatoryCol.entrySet()) {
+}
+if (e.getKey() != null) {
+if (!existingDfCols.contains (e.getKey().getLeft())) {
+sparkDs = sparkDs.withColumn (e.getKey().getLeft(), lit(e.getValue()));
+}
+sparkDs = sparkDs.withColumnRenamed (e.getKey().getLeft(), e.getKey().getRight());
+sparkDs = sparkDs.withColumn (e.getKey().getRight(), when (col(e.getKey().getRight()).isNullO), Lit(e.getValue(
+.otherwise (col (e.getKey().getRight())));
+}
+return sparkDs;
+private static String[] getStatusExecutedValues (final Config config) {
+final String executedStatus = SparkCoreConfigDefinitions.SPARK_CORE_STATUS_EXECUTED_VALUES.get(config);
+return executedStatus.split( regex: ",");
+
