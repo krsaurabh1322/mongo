@@ -255,3 +255,138 @@ cacheData.setLastCache Refresh (request.getCacheDfRequest Param().getPeriodEnd()
 
 
 ///////////////
+
+
+public enum DfCacheSourceKey {
+ENRICHED_TRADE (Enriched Trade.CACHE_NAME) {
+@Override
+public List<Document> getSparkPipelineFilter (final SparkJobRequest request,
+final String paramIndicator) {
+}
+final CacheDfRequest Param cacheDfRequest Param = request.getCacheDfRequest Param();
+return buildSparkPipelineFilterForGiven Period (
+paramIndicator, cacheDfRequest Param.getPeriodStart(), cacheDfRequest Param.getPeriodEnd());
+@Override
+public Column [] getSparkColProjections (final SparkJobRequest request,
+final Config config) {
+return SparkDataSource.initColumn Projections
+}
+}
+}
+
+/////////////
+
+
+
+
+@Data
+@Getter
+@Setter
+@Builder (toBuilder = true)
+@NoArgsConstructor
+@ALLArgsConstructor
+public class DfCacheData {
+}
+private DfCacheSourceKey id;
+private final Set<String> cachedDfKeys = Sets.newConcurrentHashSet();
+private Dataset<Row> union AllcachedDf = null;
+private Dataset<Row> intraDaycachedDf = null;
+private LocalDate lastCacheRefresh;
+public void setUnionAllcachedDf(final Dataset<Row> unionAllcachedDf) {
+if (this.unionAllcachedDf != null) {
+}
+this.unionAllcachedDf.unpersist();
+this.unionAllcachedDf = unionAllcachedDf;
+}
+}
+///////////////
+
+
+public class MultiDimensionalAggFunction {
+private final Config config;
+private final Logger logger;
+@Inject
+public MultiDimensionalAggFunction (final LoggerFactory LoggerFactory, final Config config) {
+this.config = config;
+this.logger = LoggerFactory.create (MultiDimensionalAggFunction.class);
+}
+public Dataset<Row> aggregate (final SparkJobRequest request,
+Dataset<Row> df,
+final SparkJobResponse. SparkJobResponse Builder sparkRespBuilder) {
+Dataset<Row> dfOutput = null;
+final MultiDimensionalPivotParam pivotParam= request.getMultiDimensionalAggParam();
+final List<SparkPivotParam> pivots = pivotParam.getPivots();
+if (isNotEmpty (pivots)) {
+dfOutput = df;
+for (final SparkPivotParam p: pivots) {
+final Column[] gpCols = sparkGroupCols (p);
+final List<Column> aggFunctions = getSparkAggExpr (p.getAggregations (), logger);
+if (isNotEmpty(aggFunctions) && !aggFunctions.is Empty() && StringUtils.isNotBlank (p.getPivotColName())) {
+final Relational Grouped Dataset relationalDs = getRelational GroupedDataset (request, p. dfoutput, gpCols);
+final Column first = aggFunctions.get(0);
+if (aggFunctions.size() == 1) {
+dfoutput = relationalDs,agg (first);
+I
+} else {
+Column[] aggArray = new Column [aggFunctions.size()-1];
+aggArray = aggFunctions, subList( : 1, aggFunctions.size()).toArray(aggArray);
+
+
+}
+}
+dfOutput = relationalDs.agg (first, aggArray);
+/**
+}
+} else {
+sparkRespBuilder.requestState (SparkJobRequestState.FAILED);
+Logger.warn("Request Id- {). Invalid SparkPivotParam:{}", request.getUniqueRequestId(), p);
+return null;
+dfOutput=dfoutput.na().fill(
+value: OL);
+dfOutput = dfOutput.na().fill( value: 8d);
+dfOutput = renameColumns (pivotParam.getRenameColumns (), dfOutput);
+dfOutput = applyBiRowAggregation Transformation (request, dfoutput, pivotParam.getSales AdditionalRowAggregation(), this.config);
+dfoutput = additional AggColumns (pivotParam.getAdditionalAggColumns (), dfOutput);
+dfOutput = calculateHmRatioColumns (request.getUniqueRequestId(), pivotParam.getHmRatioColumns (), dfOutput);
+dfOutput = calculateBsPressureColumns (request.getUniqueRequestId(), pivotParam.getBsPressureColumns(), dfoutput);
+dfOutput = addMandatoryColumnWithConstantValue (dfOutput, request);
+} else {
+sparkRespBuilder.requestState (SparkJobRequestState.FAILED);
+I
+Logger.warn("[SPARK: DEFINED_FUNCTION] Pivots not provided for Multi Dimensional aggregation. Request Id {}"
++ "Ignoring Job request :-} [ACTION: Please provide required parameters]", request.getUniqueRequestId(), request);
+}
+return dfOutput;
+}
+
+
+private Relational GroupedDataset getRelationalGroupedDataset (final SparkJobRequest request, final SparkPivotParam p, final Dataset<Row> dfOutput,
+final Column[] gpCols) {
+if (isNotEmpty(p.getPivotOutPutValues())) {
+return dfoutput.groupBy (gpCols).pivot (col (p.getPivotColName()), p.getPivotOut PutValues());
+} else {
+final SparkBIRequestParams biRequest Params = request.getBiRequest Params ();
+String splitBy = null;
+if (biRequestParams != null) {
+splitBy= biRequestParams.getParams () != null
+? biRequestParams.getParams ().get("SplitBy")
+= null;
+}
+if ("EcomVoice".equals(splitBy)) {
+return dfoutput.withColumn (SOURCE, when (col(SOURCE).equalTo ("VOICE"), value: "VOICE")
+.otherwise ("ECom"))
+-groupBy (gpCols)
+-pivot (col (p.getPivotColName()));
+} else if ("AttemptedvsExecuted".equals(splitby)) {
+final String[] statusExecutedValues= getStatus ExecutedValues (config);
+return dfOutput.withColumn (STATUS, when (col(STATUS).isin (statusExecutedValues), value: "Executed")
+.otherwise("Attempted"))
+.groupBy (gpCols)
+-pivot (col (p.getPivotColName()));
+} else {
+return dfoutput.groupBy (gpCols).pivot (col (p.getPivotColName()));
+}
+}
+}
+
+
