@@ -1,1 +1,26 @@
-db
+
+mongoexport --db your_database --collection your_collection --type csv --fields field1,field2,field3 --out output_file.csv
+awk 'BEGIN { FPAT = "([^,]*)|(\"[^\"]+\")" } { for (i = 1; i <= NF; i++) gsub(",", "^", $i) } 1' OFS=, output_file.csv > temp_file.csv && mv temp_file.csv output_file.csv
+
+Certainly! Let's break down the `awk` command step by step:
+
+1. `BEGIN { FPAT = "([^,]*)|(\"[^\"]+\")" }`: This part sets the `FPAT` variable, which is a built-in `awk` variable used to define the field separator pattern. 
+The pattern here is a regular expression that matches either non-comma characters `[^,]*` or strings enclosed in double quotes `\"[^\"]+\"`. 
+This allows `awk` to consider quoted fields as a single field, even if they contain commas.
+
+2. `{ for (i = 1; i <= NF; i++) gsub(",", "^", $i) }`: For each line processed by `awk`, this part loops through all fields (number of fields represented by `NF`) 
+and replaces any occurrences of commas (,) with caret (^) in each field. 
+The `gsub` function is used for global substitution, ensuring all commas within each field are replaced.
+
+3. `1`: This is a common `awk` shorthand. It evaluates to true, and since no action is specified, it performs the default action, which is to print the entire line.
+
+4. `OFS=,`: This sets the output field separator (OFS) to a comma (,). This ensures that `awk` writes the output back to CSV format, using commas as separators.
+
+5. `> temp_file.csv && mv temp_file.csv output_file.csv`: This part of the command redirects the modified output to a temporary file (`temp_file.csv`). 
+After successfully processing the file, it renames the temporary file to the original output file (`output_file.csv`).
+
+Overall, this `awk` command uses a custom field separator pattern to handle quoted fields with commas correctly. It replaces commas with carets (^) in all fields 
+while preserving the original CSV format.
+Remember to back up your data before running any commands that modify files, and test the command on a sample CSV file to ensure it works as expected for your 
+specific use case.
+
