@@ -185,3 +185,69 @@ public boolean isDfCacheValid (final SparkJobRequest req, final SparkJobResponse
 boolean isValid = true;
 if (req.getCacheDfRequest Param() != null && !req.getCacheDfRequest Param().isRefreshCache()) {
 
+
+
+final Set<String> cachedKeys = getHistoricalDfCachedKeys (req);
+final Dataset<Row> union AllcachedDf = getUnionAllHistoricalDfCache(req);
+final Map<String, List<Document>> keyFilterMap = getCacheKeyFilterMap paramindicator. "VOLUME", req.getCacheDfRequest Param())
+if (!ObjectUtils.allNotNull(cachedKeys, unionAllcachedDf)) {
+isValid = false;
+responseBuilder.requestState (SparkJobRequestState. REJECTED);
+responseBuilder.detailMessage ("Unable to process request as DF cache is not initialized");
+Logger.error("Unable to process request as DF cache is not initialized - {}", req);
+}
+final Sets.SetView<String> difference = Sets.difference (keyFilterMap.keySet(), cachedKeys);
+if (isValid && !difference.isEmpty()) {
+Logger.info("Missing required keys in DF cache. Spark Request-{} for input source-{}. "
++ "Cache DF keys required for this request - {}",
+reg.getUniqueRequestId(), getInputSourceName (req), keyFilterMap.keySet());
+Logger.info("Missing required keys in DF cache. Spark Request-{} for input collection-. Cached DF keys - {}",
+reg.getUniqueRequestId(), getInputSourceName (req), cachedKeys);
+}
+if (getOrInitCachedSource (req).getLastCacheRefresh() == null
+II getOrInitCachedSource (reg).getLastCache Refresh ().is Before (LocalDate.now().minusDays (1))) {
+Logger.info("T-1 Delta DF refresh for {} is NOT completed yet. lastCacheRefresh-{"
++ "This report may have 1 day old data. RequestId- {}",
+getInputSourceName (req), getOrInitCachedSource (req).getLastCacheRefresh(), req.getUniqueRequestId());
+}
+}
+return isValid;}
+
+
+
+private Dataset cache(final Dataset in) {
+if (in != null) {
+return in.persist (cacheStorageLevel);
+}
+public Dataset<Row> getCachedDF to ProcessRequest(final SparkJobRequest request) {
+final Dataset<Row> df;
+}
+}
+return null;
+}
+if (getUnionAllHistoricalDfCache (request) != null) {
+(request);
+df = getUnionHistoricalIntradayDfCache
+} else {
+df = null;
+Logger.error("ERROR!!! Unable to get cached DF to process request Id-). Request [{}]",
+request.getUniqueRequestId(), request);
+return df;
+public String getInputSourceName (final SparkJobRequest req) {
+return dataSourceProvider.get (req, req.getInputDataSource().getDatasourceType()).getInputSourceName (req);
+public void updateCacheRefreshDate (final SparkJobRequest request) {
+final DfCacheData cacheData = getOrInitCachedSource (request);
+if (cacheData.getLastCacheRefresh() == null
+II request.getCacheDfRequest Param().getPeriod End ().isAfter (cacheData.getLastCacheRefresh())) {
+cacheData.setLastCacheRefresh (request.getCacheDfRequest Param().getPeriodEnd());
+this.logger.info("Updated Last DF cache refresh date-() for-{}",
+cacheData.getLastCacheRefresh(),
+getInputSourceName (request));
+
+this.logger.info("Unable to update last DF cache refresh date-{} for-{}",
+cacheData.getLastCache Refresh (), getInputSourceName (request));
+}
+} else {
+public void overrideCacheRefreshDate (final SparkJobRequest request) {
+final DfCacheData cache Data = getOrInitCachedSource (request);
+cacheData.setLastCache Refresh (request.getCacheDfRequest Param().getPeriodEnd());
