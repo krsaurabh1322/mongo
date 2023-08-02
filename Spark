@@ -14,6 +14,12 @@ mongoexport --db your_database --collection your_collection --type csv --fields 
 
 sed -i -E 's/^([^,]*)"(.*?)"([^,]*)$/\1^\2^\3/g; s/,/^/g' output_file.csv
 
+
+
+mongoexport --db your_database --collection your_collection --type csv --fields field1,field2,field3 --out output_file.csv
+
+awk 'BEGIN { FPAT = "([^,]*)|(\"[^\"]+\")" } { for (i = 1; i <= NF; i++) gsub(",", "^", $i) } 1' OFS=, output_file.csv > temp_file.csv && mv temp_file.csv output_file.csv
+
 public enum DataSourceParamKey {
 OUTPUT_DB_NAME,
 OUTPUT_COLLECTION_NAME,
