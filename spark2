@@ -271,20 +271,21 @@ public class SparkDataFrameCacheManager {
 
 
 public enum DfCacheSourceKey {
-ENRICHED_TRADE (Enriched Trade.CACHE_NAME) {
-@Override
-public List<Document> getSparkPipelineFilter (final SparkJobRequest request,
-final String paramIndicator) {
-}
-final CacheDfRequest Param cacheDfRequest Param = request.getCacheDfRequest Param();
-return buildSparkPipelineFilterForGiven Period (
-paramIndicator, cacheDfRequest Param.getPeriodStart(), cacheDfRequest Param.getPeriodEnd());
-@Override
-public Column [] getSparkColProjections (final SparkJobRequest request,
-final Config config) {
-return SparkDataSource.initColumn Projections
-}
-}
+	ENRICHED_TRADE (EnrichedTrade.CACHE_NAME) {
+		@Override
+		public List<Document> getSparkPipelineFilter (final SparkJobRequest request,
+			final String paramIndicator) {
+			final CacheDfRequestParam cacheDfRequestParam = request.getCacheDfRequest Param();
+			return buildSparkPipelineFilterForGivenPeriod (
+			paramIndicator, cacheDfRequestParam.getPeriodStart(), cacheDfRequestParam.getPeriodEnd());
+		}
+		
+		@Override
+		public Column [] getSparkColProjections (final SparkJobRequest request,
+			final Config config) {
+			return SparkDataSource.initColumnProjections(SparkCoreConfigDefinitions.PSARK_CORE_TRADE_COLUMN_PROJECTIONS.gte(config));
+		}
+	}
 }
 
 /////////////
@@ -299,18 +300,17 @@ return SparkDataSource.initColumn Projections
 @NoArgsConstructor
 @ALLArgsConstructor
 public class DfCacheData {
-}
-private DfCacheSourceKey id;
-private final Set<String> cachedDfKeys = Sets.newConcurrentHashSet();
-private Dataset<Row> union AllcachedDf = null;
-private Dataset<Row> intraDaycachedDf = null;
-private LocalDate lastCacheRefresh;
-public void setUnionAllcachedDf(final Dataset<Row> unionAllcachedDf) {
-if (this.unionAllcachedDf != null) {
-}
-this.unionAllcachedDf.unpersist();
-this.unionAllcachedDf = unionAllcachedDf;
-}
+	private DfCacheSourceKey id;
+	private final Set<String> cachedDfKeys = Sets.newConcurrentHashSet();
+	private Dataset<Row> unionAllcachedDf = null;
+	private Dataset<Row> intraDaycachedDf = null;
+	private LocalDate lastCacheRefresh;
+	public void setUnionAllcachedDf(final Dataset<Row> unionAllcachedDf) {
+		if (this.unionAllcachedDf != null) {
+			this.unionAllcachedDf.unpersist();
+		}
+		this.unionAllcachedDf = unionAllcachedDf;
+	}
 }
 ///////////////
 
