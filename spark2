@@ -1,256 +1,269 @@
 
-public class SparkDataFrameCacheManager (
-public static final String ID = "_id";
-private final Logger logger;
-private final SparkDataSourceProvider dataSourceProvider;
-private final StorageLevel cacheStorageLevel;
-private final Map<DfCacheSourceKey, DfCacheData> cacheStore new ConcurrentHashMap<>();
-@Inject
-public SparkDataFrameCacheManager (final LoggerFactory LoggerFactory, final Config config, final SparkDataSourceProvider dataSourceProvider) {
-this.logger = loggerFactory.create (SparkDataFrameCacheManager.class);
-this.dataSourceProvider dataSourceProvider;
-this.cacheStorageLevel StorageLevel.fromString (SparkCoreConfigDefinitions.SPARK_CORE_CACHE_STORAGE_LEVEL.get(config));
-}
-I
-public void prepareHistoricalCache Refresh (final SparkJobRequest request) {
-if (request.getCacheDfRequest Param().isRefreshCache()) {
-final Map<String, List<Document>> keyFilterMap getCacheKeyFilterMap ( paramindicator: "VOLUME", request.getCacheDfRequestParam());
-initializeMissingCachedDfMapEntries (request, keyFilterMap);
-}
-}
+public class SparkDataFrameCacheManager {
+
+	public static final String ID = "_id";
+	private final Logger logger;
+	private final SparkDataSourceProvider dataSourceProvider;
+	private final StorageLevel cacheStorageLevel;
+	private final Map<DfCacheSourceKey, DfCacheData> cacheStore new ConcurrentHashMap<>();
+
+	public SparkDataFrameCacheManager (final LoggerFactory LoggerFactory, final Config config, final SparkDataSourceProvider dataSourceProvider) {
+		this.logger = loggerFactory.create (SparkDataFrameCacheManager.class);
+		this.dataSourceProvider dataSourceProvider;
+		this.cacheStorageLevel StorageLevel.fromString (SparkCoreConfigDefinitions.SPARK_CORE_CACHE_STORAGE_LEVEL.get(config));
+	}
+
+	public void prepareHistoricalCache Refresh (final SparkJobRequest request) {
+		if (request.getCacheDfRequestParam().isRefreshCache()) {
+			final Map<String, List<Document>> keyFilterMap = getCacheKeyFilterMap ("VOLUME", request.getCacheDfRequestParam());
+			initializeMissingCachedDfMapEntries (request, keyFilterMap);
+		}
+	}
 
 
 
-public Dataset<Row> doIntraDayCacheRefresh (final SparkJobRequest request, final SparkJobResponse.SparkJobResponse Builder builder) {
-final LocalDate currentDate= LocalDate.now();
-if (request.getCacheDfRequest Param().getPeriodStart().is Equal (request.getCacheDfRequest Param().getPeriodEnd())
-&& currentDate.isEqual (request.getCacheDfRequest Param ().getPeriodStart())) {
-Logger.info("Going to perform IntraDay Cache refresh for request-[{}]", request.getUniqueRequestId());
-final List<Document> sparkPipelineFilter = DfCacheSourceKey.from SourceName (getInputSourceName (request))
-.getSparkPipelineFilter (request, paramIndicator: "VOLUME");
-final Dataset<Row> dataset = dataSourceProvider.ingest (request, sparkPipelineFilter);
-logger.info("Going to cache records in Intraday Spark DF cache for spark Request- {}", request.getUniqueRequestId());
-final boolean isEmpty = dataset.isEmpty();
-if (!isEmpty) {
-if (getorInitCachedSource (request).getIntraDaycachedDf() != null) {
-getOrInitCachedSource (request).getIntraDaycachedDf().unpersist();
-}
-getOrInitCachedSource (request).setIntraDaycachedDf (cache (dataset));
-return getorInitCachedSource (request).getIntraDaycachedDf();
-} else {
-builder.requestState (SparkJobRequestState. REJECTED);
-builder.detailMessage("No records found for Intraday cache refresh request-" + request.getUniqueRequestId());
-Logger.info("No records found for Intraday cache refresh request-{}", request.getUniqueRequestId());
-} else {
-builder.requestState (SparkJobRequestState. REJECTED);
-builder.detailMessage ("Not a valid Intraday cache refresh request-" + request.getUniqueRequestId());
-Logger.error("Not a valid Intraday cache refresh request-{}", request.getUniqueRequestId());
+	public Dataset<Row> doIntraDayCacheRefresh (final SparkJobRequest request, final SparkJobResponse.SparkJobResponse Builder builder) {
+		final LocalDate currentDate= LocalDate.now();
+		if (request.getCacheDfRequestParam().getPeriodStart().is Equal (request.getCacheDfRequestParam().getPeriodEnd())
+			&& currentDate.isEqual (request.getCacheDfRequestParam ().getPeriodStart())) {
+			Logger.info("Going to perform IntraDay Cache refresh for request-[{}]", request.getUniqueRequestId());
+			final List<Document> sparkPipelineFilter = DfCacheSourceKey.from SourceName (getInputSourceName (request))
+			.getSparkPipelineFilter (request, "VOLUME");
+			final Dataset<Row> dataset = dataSourceProvider.ingest (request, sparkPipelineFilter);
+			logger.info("Going to cache records in Intraday Spark DF cache for spark Request- {}", request.getUniqueRequestId());
+			final boolean isEmpty = dataset.isEmpty();
+			if (!isEmpty) {
+				if (getorInitCachedSource (request).getIntraDaycachedDf() != null) {
+					getOrInitCachedSource (request).getIntraDaycachedDf().unpersist();
+				}
+				getOrInitCachedSource (request).setIntraDaycachedDf (cache (dataset));
+				return getorInitCachedSource (request).getIntraDaycachedDf();
+			} else {
+				builder.requestState (SparkJobRequestState. REJECTED);
+				builder.detailMessage("No records found for Intraday cache refresh request-" + request.getUniqueRequestId());
+				Logger.info("No records found for Intraday cache refresh request-{}", request.getUniqueRequestId());
+			}
+		} else {
+			builder.requestState (SparkJobRequestState. REJECTED);
+			builder.detailMessage ("Not a valid Intraday cache refresh request-" + request.getUniqueRequestId());
+			Logger.error("Not a valid Intraday cache refresh request-{}", request.getUniqueRequestId());
+		}
+	
+		return null;
+	}
+	
+	
+	public Dataset<Row> doDeltaCacheRefresh (final SparkJobRequest request, final SparkJobResponse.SparkJobResponseBuilder builder) {
+		LocalDate startDate = getorInitCachedSource (request).getLastCacheRefresh();
+		startDate= startDate.plusDays (1);
+		final LocalDate endDate = LocalDate.now().minusDays (1);
+		final CacheDfRequestParam cacheDfRequestParam= request.getCacheDfRequestParam();
+		cacheDfRequestParam.setPeriodStart (startDate);
+		cacheDfRequestParam.setPeriodEnd (endDate);
+		
+		if (!startDate.isAfter (endDate)) {
+			final List<Document> sparkPipelineFilter=DfCacheSourceKey.fromSourceName (getInputSourceName (request))
+			.getSparkPipelineFilter (request, "VOLUME");
+			cacheDfRequestParam.setCacheFilter (sparkPipelineFilter);
+			Logger.info("Going to perform Delta DF Cache refresh for request-[{}]", request.getUniqueRequestId());
+			final Dataset<Row> dataset = dataSourceProvider.ingest (request, sparkPipelineFilter);
+			final boolean isEmpty = dataset.isEmpty();
+			Logger.info("Going to cache records for Delta Spark DF cache Request- {}", request.getUniqueRequestId());
+			final String key = endDate.format (KEY_FORMAT);
+			//Update Monthly cached DF to include delta for one day to handle Month roll over scenario
+			getOrInitCachedSource (request).getCachedDfKeys ().add(key);
+			
+			if (!isEmpty) {
+				final Dataset<Row> df = cache (getOrInitCachedSource (request).getUnionAllcachedDf().union (dataset));
+				getOrInitCachedSource (request).setUnion AllcachedDf (df);
+				return getorInitCachedSource (request).getUnionAllcachedDf();
+			} else {
+				builder.requestState (SparkJobRequestState. REJECTED);
+				builder.detailMessage("No records found for Delta DF cache refresh request-" + request.getUniqueRequestid());
+				logger.info("No records found for Delta DF cache refresh request-{}. StartDate-(), EndDate-{}",
+				request.getUniqueRequestId(), startDate, endDate);
+			}
+		} else {
+			builder.requestState (SparkJobRequestState. REJECTED);
+			builder.detailMessage("Not a valid Delta DF cache cache refresh request-" + request.getUniqueRequestId());
+			Logger.info("Not a valid Delta DF cache refresh request-{}. StartDate-{}, EndDate-{}",
+			request.getUniqueRequestId(), startDate, endDate);
+		}
+		return null;
+	}
+	
+	public Dataset<Row> getUnionALLHistoricalDfCache(final SparkJobRequest request) {
+		return getorInitCachedSource (request).getUnionAllcachedDf();
+	}
+	
+	private Set<String> getHistoricalDfCachedKeys (final SparkJobRequest request) {
+		return getorInitCachedSource (request).getCachedDfKeys ();
+	}
+	
+	public Dataset<Row> getUnionHistoricalIntradayDfCache (final SparkJobRequest request) {
+		final SimpleTimerUtil timerUtil = new SimpleTimerUtil(logger);
+		Dataset<Row> udf = getOrInitCachedSource (request).getUnionAllcachedDf();
+		if (getorInitCachedSource (request).getIntraDaycachedDf() != null) {
+			udf = getOrInitCachedSource (request).getUnionALLcachedDf().union (getorInitCachedSource (request).getIntraDaycachedDf());
+		}	
+		return udf;
+	}
+	
+	
+	public static Map<String, List<Document>> getCacheKeyFilterMap (final String paramIndicator,
+		final CacheDfRequestParam requestParam) {
+		
+		final Map<String, List<Document>> keyFilterMap = new HashMap<> ();
+		final LocalDate initialStart = requestParam.getPeriodStart().with (TemporalAdjusters.firstDayOfMonth());
+		LocalDate initialEnd = requestParam.getPeriodEnd ();
+		if (!initialEnd.isBefore (LocalDate.now())) {
+			initialEnd = LocalDate.now().minusDays (1);
+		}
+		LocalDate tempStart = initialStart;
+		while (tempStart.isBefore(initialEnd)) {
+			final String key = tempStart.format(KEY_FORMAT);
+			LocalDate tempEnd = tempStart.with(TemporalAdjusters.lastDayOfMonth());
+			if (!tempEnd.isBefore(initialEnd)) {
+				tempEnd = initialEnd;
+			}		
+			
+			final List<Document> filter= buildSparkPipelineFilterForGivenPeriod (paramIndicator, tempStart, tempEnd);
+			keyFilterMap.put(key, filter);
+			tempStart = tempEnd.with (TemporalAdjusters.firstDayOfNext Month());
+		}
+		return keyFilterMap;
+	}
+	
+	private void initializeMissingCachedDfMapEntries (final SparkJobRequest req, final Map<String. List<Document>> keyFilterMap) {
+		final String inputRecordSource = getInputSourceName (req);
+		final DfCacheData cacheData = getOrInitCachedSource (inputRecordSource);
+		final SimpleTimerUtil timerUtil= new SimpleTimerUtil(logger);
+		timerUtil.LogEvent( eventName: "MongoSpark-Load", req.getUniqueRequestId());
+		
+		
+		if (!cacheData.getCachedDfKeys ().containsAll (keyFilterMap.keySet()) || req.getCacheDfRequestParam().isForce RefreshCache()) {
+			//req.getCacheDfRequestParam().getCacheFilter() should be same as entry.getValue()
+			Logger.info("Spark Request-for input source-{}. Refreshing DF Cache for keys-() required for this request.
+				+ "Pipeline Filter request-{}",		
+				req.getUniqueRequestId(), inputRecordSource, keyFilterMap.keySet(),
+				req.getCacheDfRequestParam().getCacheFilter());
+				
+			populateDfCacheMap (req, keyFilterMap, cacheData);
+		}
+		
+		Logger.info("Spark Request-{} for input source-{}. Cache DF keys required for this request - {}",
+		req.getUniqueRequestId(), inputRecordSource, keyFilterMap.keySet());
+		Logger.info("Spark Request-{} for input source-{}. Cached DF keys- {}",
+		req.getUniqueRequestId(), inputRecordSource, cacheData.getCachedDfKeys ().toArray());	
+	}
+	
+	private DfCacheData getOrInitCachedSource (final String inputRecordSource) {
+		//sourceKey can not be null as already validated in SparkBIFunction.validateRequest()
+		final DfCacheSourceKey sourceKey = DfCacheSourceKey.fromSourceName (inputRecordSource);
+		cacheStore.putIfAbsent (sourceKey, new DfCacheData());
+		return cacheStore.get (sourceKey);
+	}
+		
+	private DfCacheData getOrInitCachedSource (final SparkJobRequest req) {
+		return getorInitCachedSource (getInputSourceName (req));
+	}
+	
+	private void populateDfCacheMap (final SparkJobRequest req, final Map<String, List<Document>> keyFilterMap,
+		final DfCacheData cacheData) {
+		final SimpleTimerUtil timerUtil = new SimpleTimerUtil(logger);
+		final Dataset<Row> dataset = dataSourceProvider.ingest(req,
+				req.getCacheDfRequestParamParam().getCacheFilter());	
+		Logger.info("Going to cache records in Spark DF cache for spark Request-() and keys-()", req.getUniqueRequestId(), keyFilterMap.keySet());
+		final Dataset<Row> dfTypeCast = columnsTransformation (dataset);
+		final boolean isEmpty= dataset.isEmpty();
+		final Dataset<Row> cacheDf = !isEmpty ? cache(dfTypeCast): dataset;
+		keyFilterMap.forEach((k, v) -> cacheData.getCachedDfKeys ().add(k));
+		cacheData.setUnionAllcachedDf (cacheDf);
+		Logger.info("Initialized final UnionAll-DF cache for spark Request-{}", req.getUniqueRequestId());
+		timerUtil.LogEvent( eventName: "Spark-populateDfCacheMap", req.getUniqueRequestId());
+	}
+	
+	private Dataset<Row> columnsTransformation (final Dataset<Row> dataset) {
+		final List<Column> colsTypeCast = stream (dataset.columns())
+			.map(c→> ID.equals(c) ? functions.col (c).cast (DataTypes.StringType): functions.col (c))
+			.collect(tolist());
+		return dataset.select(colsTypeCast.toArray (new Column[] {}));
+	}
+	
+	public boolean isDfCacheValid (final SparkJobRequest req, final SparkJobResponse.SparkJobResponseBuilder responseBuilder) {
+		boolean isValid = true;
+		if (req.getCacheDfRequestParam() != null && !req.getCacheDfRequestParam().isRefreshCache()) {	
+		
+			final Set<String> cachedKeys = getHistoricalDfCachedKeys (req);
+			final Dataset<Row> union AllcachedDf = getUnionAllHistoricalDfCache(req);
+			final Map<String, List<Document>> keyFilterMap = getCacheKeyFilterMap("VOLUME", req.getCacheDfRequestParam());
+			if (!ObjectUtils.allNotNull(cachedKeys, unionAllcachedDf)) {
+				isValid = false;
+				responseBuilder.requestState (SparkJobRequestState. REJECTED);
+				responseBuilder.detailMessage ("Unable to process request as DF cache is not initialized");
+				Logger.error("Unable to process request as DF cache is not initialized - {}", req);
+			}
+			final Sets.SetView<String> difference = Sets.difference (keyFilterMap.keySet(), cachedKeys);
+			if (isValid && !difference.isEmpty()) {
+				Logger.info("Missing required keys in DF cache. Spark Request-{} for input source-{}. "
+				+ "Cache DF keys required for this request - {}",
+				reg.getUniqueRequestId(), getInputSourceName (req), keyFilterMap.keySet());
+				Logger.info("Missing required keys in DF cache. Spark Request-{} for input collection-. Cached DF keys - {}",
+				reg.getUniqueRequestId(), getInputSourceName (req), cachedKeys);
+			}
+			if (getOrInitCachedSource (req).getLastCacheRefresh() == null
+				|| getOrInitCachedSource (reg).getLastCacheRefresh ().isBefore (LocalDate.now().minusDays (1))) {
+				Logger.info("T-1 Delta DF refresh for {} is NOT completed yet. lastCacheRefresh-{}"
+				+ "This report may have 1 day old data. RequestId- {}",
+				getInputSourceName (req), getOrInitCachedSource (req).getLastCacheRefresh(), req.getUniqueRequestId());
+			}
+		}
+		return isValid;
+	}	
+	
+	private Dataset cache(final Dataset in) {
+		if (in != null) {
+			return in.persist (cacheStorageLevel);
+		}
+		return null;
+	}
+	
+	public Dataset<Row> getCachedDFtoProcessRequest(final SparkJobRequest request) {
+		final Dataset<Row> df;
+		if (getUnionAllHistoricalDfCache (request) != null) {
+			df = getUnionHistoricalIntradayDfCache(request);
+		} else {
+			df = null;
+			Logger.error("ERROR!!! Unable to get cached DF to process request Id-). Request [{}]",
+			request.getUniqueRequestId(), request);
+		}
+		return df;
+	}
+	
+	public String getInputSourceName (final SparkJobRequest req) {
+		return dataSourceProvider.get (req, req.getInputDataSource().getDatasourceType()).getInputSourceName (req);
+	}
+	
+	public void updateCacheRefreshDate (final SparkJobRequest request) {
+		final DfCacheData cacheData = getOrInitCachedSource (request);
+		if (cacheData.getLastCacheRefresh() == null
+		|| request.getCacheDfRequestParam().getPeriodEnd ().isAfter (cacheData.getLastCacheRefresh())) {
+			cacheData.setLastCacheRefresh (request.getCacheDfRequestParam().getPeriodEnd());
+			this.logger.info("Updated Last DF cache refresh date-() for-{}",
+			cacheData.getLastCacheRefresh(),
+			getInputSourceName (request));
+		} else {
+			this.logger.info("Unable to update last DF cache refresh date-{} for-{}",
+			cacheData.getLastCacheRefresh (), getInputSourceName (request));
+		}
+	}
+	
+	public void overrideCacheRefreshDate (final SparkJobRequest request) {
+		final DfCacheData cache Data = getOrInitCachedSource (request);
+		cacheData.setLastCache Refresh (request.getCacheDfRequestParam().getPeriodEnd());
+	}
 }
 
-return null;
-}
-
-
-public Dataset<Row> doDeltaCache Refresh (final SparkJobRequest request, final SparkJobResponse.SparkJobResponseBuilder builder)
-LocalDate startDate = getorInitCachedSource (request).getLastCacheRefresh();
-startDate= startDate.plusDays (1);
-final LocalDate endDate = LocalDate.now().minusDays (1);
-final CacheDfRequest Param cacheDfRequest Param= request.getCacheDfRequest Param();
-cacheDfRequest Param.setPeriodStart (startDate);
-cacheDfRequest Param.setPeriodEnd (endDate);
-if (!startDate.isAfter (endDate)) {
-final List<Document> sparkPipelineFilter=DfCacheSourceKey.fromSourceName (getInputSourceName (request))
-.getSparkPipelineFilter (request, paramIndicator: "VOLUME");
-cacheDfRequestParam.setCacheFilter (sparkPipelineFilter);
-Logger.info("Going to perform Delta DF Cache refresh for request-[{}]", request.getUniqueRequestId());
-final Dataset<Row> dataset = dataSourceProvider.ingest (request, sparkPipelineFilter);
-final boolean isEmpty = dataset.isEmpty();
-Logger.info("Going to cache records for Delta Spark DF cache Request- {}", request.getUniqueRequestId());
-final String key = endDate.format (KEY_FORMAT);
-//Update Monthly cached DF to include delta for one day to handle Month roll over scenario
-getOrInitCachedSource (request).getCachedDfKeys ().add(key);
-if (!isEmpty) {
-final Dataset<Row> df = cache (getOrInitCached Source (request).getUnionAllcachedDf().union (dataset));
-getOrInitCachedSource (request).setUnion AllcachedDf (df);
-
-
-
-return getorInitCachedSource (request).getUnionAllcachedDf();
-} else {
-}
-} else {
-}
-builder.requestState (SparkJobRequestState. REJECTED);
-builder.detailMessage("No records found for Delta DF cache refresh request-" + request.getUniqueRequestid());
-logger.info("No records found for Delta DF cache refresh request-{}. StartDate-(), EndDate-{}",
-request.getUniqueRequestId(), startDate, endDate);
-public Dataset<Row> getUnionALLHistoricalDfCache(final SparkJobRequest request) {
-return getorInitCachedSource (request).getUnionAllcachedDf();
-builder.requestState (SparkJobRequestState. REJECTED);
-builder.detailMessage("Not a valid Delta DF cache cache refresh request-" + request.getUniqueRequestId());
-Logger.info("Not a valid Delta DF cache refresh request-{}. StartDate-{}, EndDate-{}",
-request.getUniqueRequestId(), startDate, endDate);
-return null;
-private Set<String> getHistoricalDfCachedKeys (final SparkJobRequest request) {
-return getorInitCachedSource (request).getCachedDfKeys ();
-amn:
-public Dataset<Row> getUnionHistoricalIntradayDfCache (final SparkJobRequest request) {
-final SimpleTimerUtil timerUtil = new SimpleTimerUtil(logger);
-Dataset<Row> udf = getOrInitCachedSource (request).getUnionAllcachedDf();
-if (getorInitCachedSource (request).getIntraDaycachedDf() != null) {
-udf = getOrInitCachedSource (request).getUnionALLcachedDf().union (getorInitCachedSource (request).getIntraDaycachedDf());
-}
-
-return udf;
-}
-
-
-
-public static Map<String, List<Document>> getCacheKeyFilterMap (final String paramIndicator,
-final CacheDfRequest Param requestParam) (
-}
-final Map<String, List<Document>> keyFilterMap = new HashMap<> ();
-final LocalDate initialStart = requestParam.getPeriodStart().with (TemporalAdjusters.firstDayOfMonth());
-LocalDate initialEnd = requestParam.getPeriodEnd ();
-if (!initialEnd.isBefore (LocalDate.now())) {
-initialEnd LocalDate.now().minusDays (1);
-}
-LocalDate tempStart = initialStart;
-while (tempStart.isBefore(initialEnd)) {
-final String key = tempStart.format(KEY_FORMAT);
-LocalDate tempEnd = tempStart.with
-if (!tempEnd.isBefore(initialEnd)) {
-tempEnd = initialEnd;
-}
-(TemporalAdjusters.lastDayOfMonth());
-}
-final List<Document> filter= buildSparkPipelineFilterForGiven Period (paramIndicator, tempStart, tempEnd);
-keyFilterMap.put(key, filter);
-tempStart = tempEnd.with (TemporalAdjusters.firstDayOfNext Month());
-return keyFilterMap;
-private void initializeMissingCachedDfMapEntries (final SparkJobRequest req, final Map<String. List<Document>> keyFilterMap) {
-final String inputRecordSource = getInputSourceName (req);
-final DfCacheData cacheData = getOrInitCached Source (inputRecordSource);
-final SimpleTimerUtil timerUtil= new SimpleTimerUtil(logger);
-timerUtil.LogEvent( eventName: "MongoSpark-Load", req.getUniqueRequestId());
-
-
-if (!cacheData.getCachedDfKeys ().containsAll (keyFilterMap.keySet()) II req.getCacheDfRequestParam().isForce RefreshCache()) {
-//req.getCacheDfRequest Param().getCacheFilter() should be same as entry.getValue()
-Logger.info("Spark Request-for input source-{}. Refreshing DF Cache for keys-() required for this request.
-+ "Pipeline Filter request-{}",
-}
-}
-req.getUniqueRequestId(), inputRecordSource, keyFilterMap.keySet(),
-req.getCacheDfRequest Param().getCacheFilter());
-}
-populateDfCacheMap (req, keyFilterMap, cacheData);
-private DfCacheData getOrInitCachedSource (final String inputRecordSource) {
-//sourceKey can not be null as already validated in SparkBIFunction.validateRequest()
-final DfCacheSourceKey sourceKey = DfCacheSourceKey.fromSourceName (inputRecordSource);
-cacheStore.putIfAbsent (sourceKey, new DfCacheData());
-return cacheStore.get (sourceKey);
-Logger.info("Spark Request-{} for input source-{}. Cache DF keys required for this request - {}",
-req.getUniqueRequestId(), inputRecordSource, keyFilterMap.keySet());
-Logger.info("Spark Request-{} for input source-{}. Cached DF keys- {}",
-req.getUniqueRequestId(), inputRecordSource, cacheData.getCachedDfKeys ().toArray());
-private DfCacheData getOrInitCachedSource (final SparkJobRequest req) {
-return getorInitCachedSource (getInputSourceName (req));
-private void populateDfCacheMap (final SparkJobRequest req, final Map<String, List<Document>> keyFilterMap,
-final DfCacheData cacheData) {
-final SimpleTimerUtil timerUtil = new SimpleTimerUtil(logger);
-
-
-
-
-final Dataset<Row> dataset = dataSourceProvider.ingest(req,
-req.getCacheDfRequest Param().getCacheFilter());
-}
-cacheData.setUnionAllcachedDf (cacheDf);
-Logger.info("Initialized final UnionAll-DF cache for spark Request-{}", req.getUniqueRequestId());
-Logger.info("Going to cache records in Spark DF cache for spark Request-() and keys-()", req.getUniqueRequestId(), keyFilterMap.keySet());
-final Dataset<Row> dfTypeCast = columns Transformation (dataset);
-final boolean isEmpty= dataset.isEmpty();
-final Dataset<Row> cacheDf = !isEmpty ? cache(dfTypeCast): dataset;
-keyFilterMap.forEach((k, v) -> cacheData.getCachedDfKeys ().add(k));
-timerUtil.LogEvent( eventName: "Spark-populateDfCacheMap", req.getUniqueRequestId());
-private Dataset<Row> columns Transformation (final Dataset<Row> dataset) {
-final List<Column> colsTypeCast = stream (dataset.columns())
-.map(c→> ID.equals(c) ? functions.col (c).cast (DataTypes.StringType): functions.col (c))
-.collect(tolist());
-SpandobRequest.class
-return dataset.select(colsTypeCast.toArray (new Column[] {}));
-CacheDfRequestParar
-public boolean isDfCacheValid (final SparkJobRequest req, final SparkJobResponse, SparkJobResponseBuilder responseBuilder) {
-boolean isValid = true;
-if (req.getCacheDfRequest Param() != null && !req.getCacheDfRequest Param().isRefreshCache()) {
-
-
-
-final Set<String> cachedKeys = getHistoricalDfCachedKeys (req);
-final Dataset<Row> union AllcachedDf = getUnionAllHistoricalDfCache(req);
-final Map<String, List<Document>> keyFilterMap = getCacheKeyFilterMap paramindicator. "VOLUME", req.getCacheDfRequest Param())
-if (!ObjectUtils.allNotNull(cachedKeys, unionAllcachedDf)) {
-isValid = false;
-responseBuilder.requestState (SparkJobRequestState. REJECTED);
-responseBuilder.detailMessage ("Unable to process request as DF cache is not initialized");
-Logger.error("Unable to process request as DF cache is not initialized - {}", req);
-}
-final Sets.SetView<String> difference = Sets.difference (keyFilterMap.keySet(), cachedKeys);
-if (isValid && !difference.isEmpty()) {
-Logger.info("Missing required keys in DF cache. Spark Request-{} for input source-{}. "
-+ "Cache DF keys required for this request - {}",
-reg.getUniqueRequestId(), getInputSourceName (req), keyFilterMap.keySet());
-Logger.info("Missing required keys in DF cache. Spark Request-{} for input collection-. Cached DF keys - {}",
-reg.getUniqueRequestId(), getInputSourceName (req), cachedKeys);
-}
-if (getOrInitCachedSource (req).getLastCacheRefresh() == null
-II getOrInitCachedSource (reg).getLastCache Refresh ().is Before (LocalDate.now().minusDays (1))) {
-Logger.info("T-1 Delta DF refresh for {} is NOT completed yet. lastCacheRefresh-{"
-+ "This report may have 1 day old data. RequestId- {}",
-getInputSourceName (req), getOrInitCachedSource (req).getLastCacheRefresh(), req.getUniqueRequestId());
-}
-}
-return isValid;}
-
-
-
-private Dataset cache(final Dataset in) {
-if (in != null) {
-return in.persist (cacheStorageLevel);
-}
-public Dataset<Row> getCachedDF to ProcessRequest(final SparkJobRequest request) {
-final Dataset<Row> df;
-}
-}
-return null;
-}
-if (getUnionAllHistoricalDfCache (request) != null) {
-(request);
-df = getUnionHistoricalIntradayDfCache
-} else {
-df = null;
-Logger.error("ERROR!!! Unable to get cached DF to process request Id-). Request [{}]",
-request.getUniqueRequestId(), request);
-return df;
-public String getInputSourceName (final SparkJobRequest req) {
-return dataSourceProvider.get (req, req.getInputDataSource().getDatasourceType()).getInputSourceName (req);
-public void updateCacheRefreshDate (final SparkJobRequest request) {
-final DfCacheData cacheData = getOrInitCachedSource (request);
-if (cacheData.getLastCacheRefresh() == null
-II request.getCacheDfRequest Param().getPeriod End ().isAfter (cacheData.getLastCacheRefresh())) {
-cacheData.setLastCacheRefresh (request.getCacheDfRequest Param().getPeriodEnd());
-this.logger.info("Updated Last DF cache refresh date-() for-{}",
-cacheData.getLastCacheRefresh(),
-getInputSourceName (request));
-
-this.logger.info("Unable to update last DF cache refresh date-{} for-{}",
-cacheData.getLastCache Refresh (), getInputSourceName (request));
-}
-} else {
-public void overrideCacheRefreshDate (final SparkJobRequest request) {
-final DfCacheData cache Data = getOrInitCachedSource (request);
-cacheData.setLastCache Refresh (request.getCacheDfRequest Param().getPeriodEnd());
 
 
 
