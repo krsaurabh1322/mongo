@@ -1,4 +1,4 @@
-Sure, let's enhance the classes to support various types of joins in the Spark DataFrame caching mechanism. 
+Let's enhance the classes to support various types of joins in the Spark DataFrame caching mechanism. 
 We'll start with the `SparkJobRequest` class, and then proceed to update other classes accordingly.
 
 1. Update `SparkJobRequest` class to include join information of all types of joins:
