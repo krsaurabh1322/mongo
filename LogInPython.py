@@ -229,3 +229,30 @@ if __name__ == '__main__':
 In this example, replace `your_module` with the actual name of your module where `setup_logging` and `archive_existing_log` functions are defined. The `test_setup_logging` test case checks if the log directory and file are created correctly. The `test_archive_existing_log` test case verifies the archival of the existing log file.
 
 Remember to adjust the paths and filenames in the tests to match your setup. This example provides a starting point for writing unit tests for your logging setup functions.
+
+
+
+////////
+
+
+import gzip
+
+def archive_existing_log(logdir: str, logfile: str) -> None:
+    existing_log = f"{logdir}/{logfile}"
+    
+    if Path(existing_log).is_file():
+        timestamp = datetime.now().strftime("%Y-%m-%d_%H%M%S")
+        archived_logfile = f"{logdir}/{logfile}.{timestamp}.log.gz"  # Use the same pattern
+        
+        try:
+            # Compress the existing log file to a gzipped archive
+            with open(existing_log, 'rb') as f_in, gzip.open(archived_logfile, 'wb') as f_out:
+                f_out.writelines(f_in)
+            
+            # Remove the original log file
+            Path(existing_log).unlink()
+            
+        except Exception as e:
+            raise OperationalException(f"Error archiving existing log: {e}")
+    else:
+        logging.info("No existing log file to archive.")
