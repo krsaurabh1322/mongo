@@ -223,3 +223,58 @@ if __name__ == '__main__':
     unittest.main()
 
 //////////
+
+import unittest
+import logging
+import os
+from unittest.mock import Mock, patch
+from your_module import setup_logging, archive_existing_log, create_folder  # Import your actual module functions
+
+class TestLoggingSetup(unittest.TestCase):
+
+    def setUp(self):
+        self.config = {
+            'verbosity': 1,
+            'logconsole': False,
+            'logfile': "test_log.log",
+            'logdir': "./test_logs"
+        }
+
+    def test_setup_logging(self):
+        with patch('builtins.open', create=True), \
+             patch('gzip.open', create=True), \
+             patch.object(Path, 'is_file', return_value=True), \
+             patch.object(Path, 'unlink'), \
+             patch('os.path.exists', return_value=True):
+
+            setup_logging(self.config)
+
+            # Check if log directory and file are created
+            self.assertTrue(os.path.exists(self.config['logdir']))
+            self.assertTrue(os.path.exists(os.path.join(self.config['logdir'], self.config['logfile'])))
+
+    def test_archive_existing_log(self):
+        with patch('builtins.open', create=True), \
+             patch('gzip.open', create=True), \
+             patch.object(Path, 'is_file', return_value=True), \
+             patch.object(Path, 'unlink'), \
+             patch('datetime.datetime') as mock_datetime:
+
+            mock_datetime.now.return_value.strftime.return_value = "2023-08-15_123456"
+            archive_existing_log(self.config['logdir'], self.config['logfile'])
+
+            # Check if archived log file is created
+            archived_logfile = os.path.join(self.config['logdir'], f"{self.config['logfile']}.2023-08-15_123456.log.gz")
+            self.assertTrue(os.path.exists(archived_logfile))
+
+    def test_create_folder(self):
+        with patch('os.path.exists', return_value=False), \
+             patch('os.makedirs'):
+
+            create_folder(self.config['logdir'])
+
+            # Check if folder creation is called with correct path
+            os.makedirs.assert_called_with(self.config['logdir'], exist_ok=True)
+
+if __name__ == '__main__':
+    unittest.main()
