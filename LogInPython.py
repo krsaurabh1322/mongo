@@ -93,3 +93,61 @@ if __name__ == "__main__":
 Here the time execution logs captured by the logger_utils.log_execution_time decorator will be written to the log file specified by "$log_file".
 Meanwhile, the standard output and any error messages will be redirected to "output.log" due to the shell redirection. 
 The two types of logs will be separated in different files.
+
+
+
+
+import logging
+from logging.handlers import RotatingFileHandler
+from typing import Dict, Any
+from pathlib import Path
+from datetime import datetime
+
+def setup_logging(config: Dict[str, Any]) -> None:
+    # Log level
+    verbosity = config.get('verbosity', 0)
+    
+    # Log to console
+    if not config.get('logconsole', 0):
+        logging.root.handlers = []
+    
+    # Logging to a file
+    logfile = config.get('logfile', "what_if_analysis.log")
+    if logfile:
+        logdir = config.get("logdir", "./logs")
+        create_folder(logdir)
+        
+        # Archive the existing log file
+        archive_existing_log(logdir, logfile)
+        
+        # Configure the main log handler with rotation
+        handler_rf = RotatingFileHandler(
+            f"{logdir}/{logfile}",
+            maxBytes=1024 * 1024 * 10,  # 10MB
+            backupCount=10
+        )
+        handler_rf.setFormatter(logging.Formatter(LOGFORMAT))
+        
+        # Add the handler to root logger
+        logging.root.addHandler(handler_rf)
+        
+    logging.root.setLevel(logging.INFO if verbosity < 1 else logging.DEBUG)
+    _set_loggers(verbosity)
+
+def archive_existing_log(logdir: str, logfile: str) -> None:
+    timestamp = datetime.now().strftime("%Y-%m-%d_%H%M%S")
+    archived_logfile = f"{logdir}/{logfile}.{timestamp}.log.gz"
+    
+    try:
+        # Rename the existing log file
+        existing_log = f"{logdir}/{logfile}"
+        Path(existing_log).rename(archived_logfile)
+    except Exception as e:
+        raise OperationalException(f"Error archiving existing log: {e}")
+
+def create_folder(path: str) -> None:
+    try:
+        logging.info(f"Checking if folder {path} exists")
+        Path(path).mkdir(parents=True, exist_ok=True)
+    except Exception as e:
+        raise OperationalException(f"{e}\n" f"Folder creation {path} failed.")
