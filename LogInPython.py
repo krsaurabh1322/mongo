@@ -169,3 +169,63 @@ def archive_existing_log(logdir: str, logfile: str) -> None:
             raise OperationalException(f"Error archiving existing log: {e}")
     else:
         logging.info("No existing log file to archive.")
+
+
+
+////////
+
+
+Certainly! Here's an example of how you could write unit tests for the `setup_logging` function and the `archive_existing_log` function using the `unittest` framework:
+
+```python
+import unittest
+import logging
+import os
+from your_module import setup_logging, archive_existing_log  # Import your actual module functions
+
+class TestLoggingSetup(unittest.TestCase):
+
+    def test_setup_logging(self):
+        config = {
+            'verbosity': 1,
+            'logconsole': False,
+            'logfile': "test_log.log",
+            'logdir': "./test_logs"
+        }
+        
+        setup_logging(config)
+        
+        # Check if log directory and file are created
+        self.assertTrue(os.path.exists(config['logdir']))
+        self.assertTrue(os.path.exists(os.path.join(config['logdir'], config['logfile'])))
+        
+        # Clean up
+        logging.root.handlers = []
+        os.remove(os.path.join(config['logdir'], config['logfile']))
+
+    def test_archive_existing_log(self):
+        logdir = "./test_logs"
+        logfile = "test_log.log"
+        existing_logfile = os.path.join(logdir, logfile)
+        
+        # Create a dummy log file
+        with open(existing_logfile, 'w') as f:
+            f.write("Test log content")
+        
+        archive_existing_log(logdir, logfile)
+        
+        # Check if archived log file is created
+        archived_logfile = os.path.join(logdir, f"{logfile}.archived.log.gz")
+        self.assertTrue(os.path.exists(archived_logfile))
+        
+        # Clean up
+        os.remove(existing_logfile)
+        os.remove(archived_logfile)
+
+if __name__ == '__main__':
+    unittest.main()
+```
+
+In this example, replace `your_module` with the actual name of your module where `setup_logging` and `archive_existing_log` functions are defined. The `test_setup_logging` test case checks if the log directory and file are created correctly. The `test_archive_existing_log` test case verifies the archival of the existing log file.
+
+Remember to adjust the paths and filenames in the tests to match your setup. This example provides a starting point for writing unit tests for your logging setup functions.
