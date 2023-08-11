@@ -151,3 +151,21 @@ def create_folder(path: str) -> None:
         Path(path).mkdir(parents=True, exist_ok=True)
     except Exception as e:
         raise OperationalException(f"{e}\n" f"Folder creation {path} failed.")
+
+
+//////
+
+def archive_existing_log(logdir: str, logfile: str) -> None:
+    existing_log = f"{logdir}/{logfile}"
+    
+    if Path(existing_log).is_file():
+        timestamp = datetime.now().strftime("%Y-%m-%d_%H%M%S")
+        archived_logfile = f"{logdir}/{logfile}.{timestamp}.log.gz"
+        
+        try:
+            # Rename the existing log file
+            Path(existing_log).rename(archived_logfile)
+        except Exception as e:
+            raise OperationalException(f"Error archiving existing log: {e}")
+    else:
+        logging.info("No existing log file to archive.")
