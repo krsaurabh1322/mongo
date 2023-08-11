@@ -376,3 +376,45 @@ class TestLoggingSetup(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+
+////////
+
+
+import gzip
+
+def archive_log_file(log_path: str, archived_log_path: str) -> None:
+    try:
+        # Rename the log file
+        Path(log_path).rename(archived_log_path)
+        
+        # Compress the log file to a gzipped archive
+        with open(archived_log_path, 'rb') as f_in, gzip.open(f"{archived_log_path}.gz", 'wb') as f_out:
+            f_out.writelines(f_in)
+        
+        # Remove the original log file
+        Path(archived_log_path).unlink()
+        
+    except Exception as e:
+        raise OperationalException(f"Error archiving log: {e}")
+
+def archive_existing_log(logdir: str, logfile: str) -> None:
+    existing_log = f"{logdir}/{logfile}"
+    
+    if Path(existing_log).is_file():
+        timestamp = datetime.now().strftime("%Y-%m-%d_%H%M%S")
+        archived_logfile = f"{logdir}/{logfile}.{timestamp}.log"
+        archive_log_file(existing_log, archived_logfile)
+        
+        # Archive rolled over log files with indexes
+        for i in range(10):  # Adjust the range based on your backupCount value
+            rolled_over_log = f"{logdir}/{logfile}.{i}"
+            
+            if Path(rolled_over_log).is_file():
+                archived_rolled_over_log = f"{logdir}/{logfile}.{i}.{timestamp}.log"
+                archive_log_file(rolled_over_log, archived_rolled_over_log)
+            else:
+                break  # Exit loop if no more rolled over log files
+    else:
+        logging.info("No existing log file to archive.")
