@@ -278,3 +278,101 @@ class TestLoggingSetup(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+////////
+
+
+import unittest
+import logging
+import os
+import gzip
+from unittest.mock import Mock, patch
+from pathlib import Path
+from datetime import datetime
+
+# Your original functions
+def setup_logging(config):
+    # ... (unchanged setup_logging function with the modified archive_existing_log)
+
+def archive_existing_log(logdir, logfile):
+    for i in range(10):  # Adjust the range based on your backupCount value
+        existing_log = f"{logdir}/{logfile}.{i}"
+        
+        if Path(existing_log).is_file():
+            timestamp = datetime.now().strftime("%Y-%m-%d_%H%M%S")
+            archived_logfile = f"{logdir}/{logfile}.{i}.{timestamp}.log"
+            gzipped_archived_logfile = f"{archived_logfile}.gz"  # Add .gz extension
+            
+            try:
+                # Rename the existing log file
+                Path(existing_log).rename(archived_logfile)
+                
+                # Compress the archived log file to a gzipped archive
+                with open(archived_logfile, 'rb') as f_in, gzip.open(gzipped_archived_logfile, 'wb') as f_out:
+                    f_out.writelines(f_in)
+                
+                # Remove the original archived log file
+                Path(archived_logfile).unlink()
+                
+            except Exception as e:
+                raise OperationalException(f"Error archiving existing log: {e}")
+        else:
+            break  # Exit loop if no more rolled over log files
+
+def create_folder(path):
+    try:
+        logging.info(f"Checking if folder {path} exists")
+        Path(path).mkdir(parents=True, exist_ok=True)
+    except Exception as e:
+        raise OperationalException(f"{e}\n" f"Folder creation {path} failed.")
+
+# Unit tests
+class TestLoggingSetup(unittest.TestCase):
+
+    def setUp(self):
+        self.config = {
+            'verbosity': 1,
+            'logconsole': False,
+            'logfile': "test_log.log",
+            'logdir': "./test_logs"
+        }
+
+    def test_setup_logging(self):
+        with patch('builtins.open', create=True), \
+             patch('gzip.open', create=True), \
+             patch.object(Path, 'is_file', return_value=True), \
+             patch.object(Path, 'unlink'), \
+             patch('os.path.exists', return_value=True):
+
+            setup_logging(self.config)
+
+            # Check if log directory and file are created
+            self.assertTrue(os.path.exists(self.config['logdir']))
+            self.assertTrue(os.path.exists(os.path.join(self.config['logdir'], self.config['logfile'])))
+
+    def test_archive_existing_log(self):
+        with patch('builtins.open', create=True), \
+             patch('gzip.open', create=True), \
+             patch.object(Path, 'is_file', return_value=True), \
+             patch.object(Path, 'unlink'), \
+             patch('datetime.datetime') as mock_datetime:
+
+            mock_datetime.now.return_value.strftime.return_value = "2023-08-15_123456"
+            archive_existing_log(self.config['logdir'], self.config['logfile'])
+
+            # Check if archived log file is created
+            archived_logfile = os.path.join(self.config['logdir'], f"{self.config['logfile']}.0.2023-08-15_123456.log.gz")
+            self.assertTrue(os.path.exists(archived_logfile))
+
+    def test_create_folder(self):
+        with patch('os.path.exists', return_value=False), \
+             patch('os.makedirs'):
+
+            create_folder(self.config['logdir'])
+
+            # Check if folder creation is called with correct path
+            os.makedirs.assert_called_with(self.config['logdir'], exist_ok=True)
+
+if __name__ == '__main__':
+    unittest.main()
