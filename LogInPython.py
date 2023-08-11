@@ -418,3 +418,85 @@ def archive_existing_log(logdir: str, logfile: str) -> None:
                 break  # Exit loop if no more rolled over log files
     else:
         logging.info("No existing log file to archive.")
+
+
+///////
+
+
+import unittest
+import logging
+import os
+import gzip
+from unittest.mock import Mock, patch
+from pathlib import Path
+from datetime import datetime
+from your_module import setup_logging, archive_existing_log, create_folder, archive_log_file  # Import your actual module functions
+
+class TestLoggingSetup(unittest.TestCase):
+
+    def setUp(self):
+        self.config = {
+            'verbosity': 1,
+            'logconsole': False,
+            'logfile': "test_log.log",
+            'logdir': "./test_logs"
+        }
+
+    def test_setup_logging(self):
+        with patch('builtins.open', create=True), \
+             patch('gzip.open', create=True), \
+             patch.object(Path, 'is_file', return_value=True), \
+             patch.object(Path, 'unlink'), \
+             patch('os.path.exists', return_value=True):
+
+            setup_logging(self.config)
+
+            # Check if log directory and file are created
+            self.assertTrue(os.path.exists(self.config['logdir']))
+            self.assertTrue(os.path.exists(os.path.join(self.config['logdir'], self.config['logfile'])))
+
+    def test_archive_log_file(self):
+        log_content = b"Test log content"
+        archived_log_content = b"Archived log content"
+
+        with patch('builtins.open', create=True) as mock_open, \
+             patch('gzip.open', create=True) as mock_gzip_open, \
+             patch.object(Path, 'rename'), \
+             patch.object(Path, 'unlink'):
+
+            mock_open.return_value.__enter__.return_value.read.return_value = log_content
+            mock_gzip_open.return_value.__enter__.return_value.write.return_value = None
+
+            archive_log_file("test_log.log", "archived_test_log.log")
+
+            # Check if log file is renamed and gzipped
+            Path.rename.assert_called_once_with("test_log.log", "archived_test_log.log")
+            mock_gzip_open.assert_called_once_with("archived_test_log.log", 'wb')
+            mock_gzip_open.return_value.__enter__.return_value.write.assert_called_once_with(log_content)
+
+    def test_archive_existing_log(self):
+        with patch('builtins.open', create=True), \
+             patch('gzip.open', create=True), \
+             patch.object(Path, 'is_file', return_value=True), \
+             patch('datetime.datetime') as mock_datetime, \
+             patch.object(Path, 'rename'), \
+             patch.object(Path, 'unlink'):
+
+            mock_datetime.now.return_value.strftime.return_value = "2023-08-15_123456"
+            archive_existing_log(self.config['logdir'], self.config['logfile'])
+
+            # Check if archived log file is created
+            archived_logfile = os.path.join(self.config['logdir'], f"{self.config['logfile']}.2023-08-15_123456.log.gz")
+            self.assertTrue(os.path.exists(archived_logfile))
+
+    def test_create_folder(self):
+        with patch('os.path.exists', return_value=False), \
+             patch('os.makedirs'):
+
+            create_folder(self.config['logdir'])
+
+            # Check if folder creation is called with correct path
+            os.makedirs.assert_called_with(self.config['logdir'], exist_ok=True)
+
+if __name__ == '__main__':
+    unittest.main()
