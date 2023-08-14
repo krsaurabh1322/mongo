@@ -623,3 +623,38 @@ class TestLoggingSetup(unittest.TestCase):
 if __name__ == '__main__':
     unittest.main()
 
+
+
+/////////
+test case
+
+
+
+import unittest
+from unittest.mock import patch, Mock
+from your_module import get_config_from_txt_file  # Import your actual module functions
+
+class TestMongoServerUri(unittest.TestCase):
+
+    @patch('builtins.open', new_callable=unittest.mock.mock_open, read_data='PROD_SERVER_1=server1.com\nPROD_SERVER_2=server2.com\n')
+    def test_get_config_from_txt_file(self, mock_open):
+        config = get_config_from_txt_file('dummy_path')
+        self.assertEqual(config, {'PROD_SERVER_1': 'server1.com', 'PROD_SERVER_2': 'server2.com'})
+
+    @patch('os.environ', {"MONGO_ACT_PWD": "test_password"})
+    @patch('builtins.open', new_callable=unittest.mock.mock_open, read_data='cat.mongo.servers=${PROD_SERVER_2}, ${PROD_SERVER_1}')
+    def test_mongo_server_uri(self, mock_open, mock_environ):
+        # Mock the logger
+        with patch('your_module.logger') as mock_logger:
+            # Mock the get_config_from_txt_file function
+            with patch('your_module.get_config_from_txt_file', side_effect=[{'PROD_SERVER_1': 'server1.com', 'PROD_SERVER_2': 'server2.com'}, {'cat.mongo.servers': '${PROD_SERVER_2}, ${PROD_SERVER_1}'}]):
+                # Run your code
+                run_your_code()
+                
+                # Verify the mock logger has been called with the expected URI
+                expected_uri = 'server2.com:MONGO_PORT,server1.com:MONGO_PORT'
+                mock_logger.info.assert_called_once_with(f"Mongo servers URI: {expected_uri}")
+
+if __name__ == '__main__':
+    unittest.main()
+
