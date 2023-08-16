@@ -1,1 +1,55 @@
 
+import java.util.ArrayList;
+import java.util.List;
+
+public class JoinConfig {
+
+    public enum JoinType {
+        INNER, LEFT, RIGHT, FULL
+    }
+
+    public static class JoinCondition {
+        private String leftColumn;
+        private String rightColumn;
+        private String filter;
+
+        public JoinCondition(String leftColumn, String rightColumn, String filter) {
+            this.leftColumn = leftColumn;
+            this.rightColumn = rightColumn;
+            this.filter = filter;
+        }
+
+        public String getLeftColumn() {
+            return leftColumn;
+        }
+
+        public String getRightColumn() {
+            return rightColumn;
+        }
+
+        public String getFilter() {
+            return filter;
+        }
+    }
+
+    private JoinType joinType;
+    private List<JoinCondition> joinConditions;
+
+    public JoinConfig(JoinType joinType) {
+        this.joinType = joinType;
+        this.joinConditions = new ArrayList<>();
+    }
+
+    public void addJoinCondition(String leftColumn, String rightColumn, String filter) {
+        JoinCondition condition = new JoinCondition(leftColumn, rightColumn, filter);
+        joinConditions.add(condition);
+    }
+
+    public JoinType getJoinType() {
+        return joinType;
+    }
+
+    public List<JoinCondition> getJoinConditions() {
+        return joinConditions;
+    }
+}
