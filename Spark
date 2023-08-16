@@ -53,3 +53,44 @@ public class JoinConfig {
         return joinConditions;
     }
 }
+
+
+import java.util.List;
+
+public class SparkMongoDataSource implements SparkDataSource<List<Document>> {
+
+    // Existing methods and constructors
+    
+    // New join method
+    public Dataset<Row> join(SparkSession sparkSession, Dataset<Row> leftDataset, String leftAlias,
+                             Dataset<Row> rightDataset, String rightAlias, JoinConfig joinConfig) {
+        // Build join conditions
+        Column[] joinConditions = joinConfig.getJoinConditions().stream()
+                .map(condition -> functions.expr(condition.getFilter()))
+                .toArray(Column[]::new);
+        
+        // Perform join
+        return leftDataset.alias(leftAlias)
+                .join(rightDataset.alias(rightAlias), joinConditions, joinConfig.getJoinType().toString());
+    }
+}
+
+
+v
+public class SparkMongoDataSource implements SparkDataSource<List<Document>> {
+
+    // Existing methods and constructors
+    
+    // New join method
+    public Dataset<Row> join(SparkSession sparkSession, Dataset<Row> leftDataset, String leftAlias,
+                             Dataset<Row> rightDataset, String rightAlias, JoinConfig joinConfig) {
+        // Build join conditions
+        Column[] joinConditions = joinConfig.getJoinConditions().stream()
+                .map(condition -> functions.expr(condition.getFilter()))
+                .toArray(Column[]::new);
+        
+        // Perform join
+        return leftDataset.alias(leftAlias)
+                .join(rightDataset.alias(rightAlias), joinConditions, joinConfig.getJoinType().toString());
+    }
+}
