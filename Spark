@@ -184,3 +184,76 @@ public class JoinConfig {
     }
 }
 
+
+
+
+public class SparkMongoDataSourceTest {
+
+    public static void main(String[] args) {
+        // Existing code
+        
+        // Define join conditions, group by columns, and aggregate functions
+        JoinConfig joinConfigXYZ = new JoinConfig(JoinConfig.JoinType.LEFT);
+        joinConfigXYZ.addJoinCondition("X.id", "Y.id", null);
+        joinConfigXYZ.addJoinCondition("X.id", "Z.id", null);
+        joinConfigXYZ.addGroupByColumn("X.id");
+        joinConfigXYZ.addAggregateFunction("Y.total", "sum(Y.total)");
+        joinConfigXYZ.addAggregateFunction("Z.value", "avg(Z.value)");
+        joinConfigXYZ.addSelectColumn("X.id");
+        joinConfigXYZ.addSelectColumn("Y.name");
+        joinConfigXYZ.addSelectColumn("Z.value");
+
+        // Perform join with group by and aggregation
+        Dataset<Row> joinedXYZ = dataSource.join(spark, datasetX, "X", datasetY, "Y", joinConfigXYZ);
+        joinedXYZ.show();
+
+        spark.stop();
+    }
+}
+
+
+
+import org.apache.spark.sql.Column;
+import org.apache.spark.sql.Dataset;
+import org.apache.spark.sql.Row;
+import org.apache.spark.sql.SparkSession;
+import org.apache.spark.sql.functions;
+
+import java.util.List;
+import java.util.Map;
+
+public class SparkMongoDataSource implements SparkDataSource<List<Document>> {
+    // Existing methods
+    
+    public Dataset<Row> join(SparkSession sparkSession, Dataset<Row> leftDataset, String leftAlias,
+                             Dataset<Row> rightDataset, String rightAlias, JoinConfig joinConfig) {
+        // Build join conditions
+        Column[] joinConditions = joinConfig.getJoinConditions().stream()
+                .map(condition -> functions.expr(condition.getFilter()))
+                .toArray(Column[]::new);
+        
+        // Build group by columns
+        Column[] groupByColumns = joinConfig.getGroupByColumns().stream()
+                .map(colName -> functions.col(colName))
+                .toArray(Column[]::new);
+
+        // Build select columns
+        Column[] selectColumns = joinConfig.getSelectColumns().stream()
+                .map(colName -> functions.col(colName))
+                .toArray(Column[]::new);
+        
+        // Build aggregate functions
+        Column[] aggregateColumns = joinConfig.getAggregateFunctions().entrySet().stream()
+                .map(entry -> functions.expr(entry.getValue()).as(entry.getKey()))
+                .toArray(Column[]::new);
+        
+        // Perform join and group by
+        Dataset<Row> joinedData = leftDataset.alias(leftAlias)
+                .join(rightDataset.alias(rightAlias), joinConditions, joinConfig.getJoinType().toString())
+                .groupBy(groupByColumns)
+                .agg(aggregateColumns[0], aggregateColumns); // Applying multiple aggregate functions
+        
+        // Select the final columns
+        return joinedData.select(selectColumns);
+    }
+}
