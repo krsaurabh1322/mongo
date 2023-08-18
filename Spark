@@ -257,3 +257,240 @@ public class SparkMongoDataSource implements SparkDataSource<List<Document>> {
         return joinedData.select(selectColumns);
     }
 }
+
+///////////
+
+
+import com.mongodb.spark.MongoSpark;
+import org.apache.spark.api.java.JavaSparkContext;
+import org.apache.spark.sql.Dataset;
+import org.apache.spark.sql.Row;
+import org.apache.spark.sql.SparkSession;
+import org.apache.spark.sql.functions;
+import org.apache.spark.sql.types.StructType;
+import scala.collection.JavaConverters;
+
+import java.util.List;
+import java.util.Map;
+
+public class SparkMongoDataSource implements SparkDataSource<Dataset<Row>> {
+    // ... Other existing fields and methods
+
+    @Override
+    public Dataset<Row> load(SparkJobRequest request, Dataset<Row> filter) {
+        // ... Existing loading logic
+        return loadWithSchema(schema, request, filter);
+    }
+
+    private Dataset<Row> performJoins(SparkJobRequest request, Dataset<Row> baseDataFrame) {
+        List<JoinConfig> joinConfigs = request.getJoinConfigs();
+        
+        if (joinConfigs != null && !joinConfigs.isEmpty()) {
+            for (JoinConfig joinConfig : joinConfigs) {
+                Dataset<Row> rightDataFrame = loadRightDatasetForJoin(joinConfig);
+                Map<String, String> joinColumnsMapping = getJoinColumnsMapping(joinConfig);
+                
+                // Rename columns in the rightDataFrame
+                rightDataFrame = renameColumns(rightDataFrame, joinColumnsMapping);
+                
+                // Perform join
+                baseDataFrame = baseDataFrame.join(
+                        rightDataFrame,
+                        JavaConverters.asScalaIteratorConverter(joinColumnsMapping.entrySet().iterator()).asScala().toSeq(),
+                        joinConfig.getJoinType().toString().toLowerCase()
+                );
+            }
+        }
+        return baseDataFrame;
+    }
+
+    private Dataset<Row> renameColumns(Dataset<Row> dataFrame, Map<String, String> columnMapping) {
+        for (Map.Entry<String, String> entry : columnMapping.entrySet()) {
+            dataFrame = dataFrame.withColumnRenamed(entry.getKey(), entry.getValue());
+        }
+        return dataFrame;
+    }
+
+    @Override
+    public Dataset<Row> ingest(SparkJobRequest request, Dataset<Row> filter) {
+        final SimpleTimerUtil timerUtil = new SimpleTimerUtil(logger);
+        Dataset<Row> baseDataFrame = load(request, filter);
+        
+        // Perform joins if joinConfigs are provided
+        baseDataFrame = performJoins(request, baseDataFrame);
+
+        // Apply select columns, group by, and aggregation
+        baseDataFrame = applySelectColumns(baseDataFrame, request.getSelectColumns());
+        baseDataFrame = applyGroupBy(baseDataFrame, request.getGroupByColumns());
+        baseDataFrame = applyAggregation(baseDataFrame, request.getAggregateFunctions());
+
+        // ... Other processing logic
+        return baseDataFrame;
+    }
+    
+    // Implement loadRightDatasetForJoin, getJoinColumnsMapping, applySelectColumns,
+    // applyGroupBy, and applyAggregation methods
+}
+
+
+
+
+import org.apache.spark.sql.Column;
+import org.apache.spark.sql.Dataset;
+import org.apache.spark.sql.Row;
+import org.apache.spark.sql.functions;
+import org.apache.spark.sql.types.DataTypes;
+import org.apache.spark.sql.types.StructType;
+
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+public class SparkMongoDataSource implements SparkDataSource<Dataset<Row>> {
+    // ... Other existing fields and methods
+
+    // ... Existing load method
+
+    private Dataset<Row> loadRightDatasetForJoin(JoinConfig joinConfig) {
+        // Example: Load the right dataset based on joinConfig.getRightDataset()
+        // You should load the dataset using your data source logic
+        // For this example, let's assume we load it from the same source as the baseDataFrame
+        // Replace with your actual data loading logic
+        return loadWithSchema(schema, joinConfig.getRightDataset(), null);
+    }
+
+    private Map<String, String> getJoinColumnsMapping(JoinConfig joinConfig) {
+        // Assuming joinColumns in JoinConfig are in pairs (left column, right column)
+        Map<String, String> mapping = new HashMap<>();
+        List<String> joinColumns = joinConfig.getJoinColumns();
+
+        for (int i = 0; i < joinColumns.size(); i += 2) {
+            mapping.put(joinColumns.get(i + 1), joinColumns.get(i));
+        }
+        return mapping;
+    }
+
+    private Dataset<Row> applySelectColumns(Dataset<Row> dataFrame, List<String> selectColumns) {
+        if (selectColumns != null && !selectColumns.isEmpty()) {
+            Column[] columns = selectColumns.stream().map(functions::col).toArray(Column[]::new);
+            return dataFrame.select(columns);
+        }
+        return dataFrame;
+    }
+
+    private Dataset<Row> applyGroupBy(Dataset<Row> dataFrame, List<String> groupByColumns) {
+        if (groupByColumns != null && !groupByColumns.isEmpty()) {
+            Column[] columns = groupByColumns.stream().map(functions::col).toArray(Column[]::new);
+            return dataFrame.groupBy(columns).agg(functions.expr("*"));
+        }
+        return dataFrame;
+    }
+
+    private Dataset<Row> applyAggregation(Dataset<Row> dataFrame, Map<String, String> aggregateFunctions) {
+        if (aggregateFunctions != null && !aggregateFunctions.isEmpty()) {
+            Column[] aggColumns = aggregateFunctions.entrySet()
+                    .stream()
+                    .map(entry -> functions.expr(entry.getValue()).as(entry.getKey()))
+                    .toArray(Column[]::new);
+            return dataFrame.agg(aggColumns);
+        }
+        return dataFrame;
+    }
+
+    @Override
+    public Dataset<Row> ingest(SparkJobRequest request, Dataset<Row> filter) {
+        final SimpleTimerUtil timerUtil = new SimpleTimerUtil(logger);
+        Dataset<Row> baseDataFrame = load(request, filter);
+        
+        // Perform joins if joinConfigs are provided
+        baseDataFrame = performJoins(request, baseDataFrame);
+
+        // Apply select columns, group by, and aggregation
+        baseDataFrame = applySelectColumns(baseDataFrame, request.getSelectColumns());
+        baseDataFrame = applyGroupBy(baseDataFrame, request.getGroupByColumns());
+        baseDataFrame = applyAggregation(baseDataFrame, request.getAggregateFunctions());
+
+        // ... Other processing logic
+        return baseDataFrame;
+    }
+    
+    // Other methods
+}
+
+
+import org.apache.spark.sql.SparkSession;
+import org.apache.spark.sql.Dataset;
+import org.apache.spark.sql.Row;
+import org.apache.spark.sql.functions;
+import org.apache.spark.sql.types.DataTypes;
+import org.junit.AfterClass;
+import org.junit.BeforeClass;
+import org.junit.Test;
+
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+
+public class SparkMongoDataSourceTest {
+
+    private static SparkSession spark;
+
+    @BeforeClass
+    public static void setUp() {
+        spark = SparkSession.builder()
+                .appName("SparkMongoDataSourceTest")
+                .master("local[*]")
+                .getOrCreate();
+    }
+
+    @AfterClass
+    public static void tearDown() {
+        spark.stop();
+    }
+
+    @Test
+    public void testSparkMongoDataSource() {
+        // Create test data
+        List<Row> leftData = Arrays.asList(
+                RowFactory.create("A", 10),
+                RowFactory.create("B", 20),
+                RowFactory.create("C", 30)
+        );
+        List<Row> rightData = Arrays.asList(
+                RowFactory.create("A", "X", 100),
+                RowFactory.create("B", "Y", 200),
+                RowFactory.create("C", "Z", 300)
+        );
+
+        StructType schema = new StructType()
+                .add("leftKey", DataTypes.StringType)
+                .add("leftValue", DataTypes.IntegerType);
+        Dataset<Row> leftDataset = spark.createDataFrame(leftData, schema);
+
+        schema = new StructType()
+                .add("rightKey", DataTypes.StringType)
+                .add("rightDesc", DataTypes.StringType)
+                .add("rightValue", DataTypes.IntegerType);
+        Dataset<Row> rightDataset = spark.createDataFrame(rightData, schema);
+
+        // Create a JoinConfig
+        JoinConfig joinConfig = new JoinConfig(JoinConfig.JoinType.INNER);
+        joinConfig.addJoinCondition("leftKey", "rightKey", null);
+
+        // Create a SparkJobRequest
+        SparkJobRequest request = new SparkJobRequest();
+        request.setSelectColumns(Collections.singletonList("leftValue"));
+        request.setGroupByColumns(Collections.singletonList("rightDesc"));
+        request.addAggregateFunction("leftValue", "sum");
+
+        // Create SparkMongoDataSource instance
+        SparkMongoDataSource dataSource = new SparkMongoDataSource(/* Pass required dependencies */);
+
+        // Perform join and transformations
+        Dataset<Row> resultDataFrame = dataSource.ingest(request, leftDataset, rightDataset, joinConfig);
+
+        // Show the result DataFrame
+        resultDataFrame.show();
+    }
+}
