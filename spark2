@@ -1,1 +1,149 @@
 
+public class JoinConfig {
+    private String leftDataset;
+    private String rightDataset;
+    private List<String> joinColumns;
+    private JoinType joinType;
+    private List<String> selectColumnsRight;
+    private List<String> groupByColumnsRight;
+    private Map<String, String> aggregateFunctionsRight;
+    private String filterRight;
+    private String havingClauseRight; // New attribute for HAVING clause
+
+    // Constructors, getters, setters, etc.
+}
+
+
+@Override
+public Dataset<Row> load(SparkJobRequest request, JoinConfig joinConfig) {
+    Dataset<Row> leftDataset = loadLeftDataset(request);
+    Dataset<Row> rightDataset = loadRightDatasetForJoin(request, joinConfig);
+
+    // Perform the join
+    Dataset<Row> result = leftDataset.join(rightDataset, joinConfig.getJoinColumns(), joinConfig.getJoinType().toString());
+
+    // Apply filtering
+    if (joinConfig.getFilterRight() != null) {
+        result = result.filter(joinConfig.getFilterRight());
+    }
+
+    // Apply group by and aggregation
+    if (!joinConfig.getGroupByColumnsRight().isEmpty() && !joinConfig.getAggregateFunctionsRight().isEmpty()) {
+        result = applyGroupByAndAggregation(result, joinConfig.getGroupByColumnsRight(), joinConfig.getAggregateFunctionsRight());
+
+        // Apply HAVING clause
+        if (joinConfig.getHavingClauseRight() != null) {
+            result = result.having(joinConfig.getHavingClauseRight());
+        }
+    }
+
+    // Apply select columns
+    if (!joinConfig.getSelectColumnsRight().isEmpty()) {
+        result = applySelectColumns(result, joinConfig.getSelectColumnsRight());
+    }
+
+    return result;
+}
+
+private Dataset<Row> applyGroupByAndAggregation(Dataset<Row> inputDF, List<String> groupByColumns, Map<String, String> aggregateFunctions) {
+    Column[] groupByExpr = groupByColumns.stream().map(functions::col).toArray(Column[]::new);
+    List<Column> aggExprList = new ArrayList<>();
+
+    for (Map.Entry<String, String> entry : aggregateFunctions.entrySet()) {
+        String columnName = entry.getKey();
+        String aggFunction = entry.getValue();
+        aggExprList.add(functions.callUDF(aggFunction, functions.col(columnName)).as(columnName));
+    }
+
+    return inputDF.groupBy(groupByExpr).agg(aggExprList.toArray(new Column[0]));
+}
+
+private Dataset<Row> applySelectColumns(Dataset<Row> inputDF, List<String> selectColumns) {
+    Column[] selectExpr = selectColumns.stream().map(functions::col).toArray(Column[]::new);
+    return inputDF.select(selectExpr);
+}
+
+
+private Dataset<Row> loadRightDatasetForJoin(SparkJobRequest request, JoinConfig joinConfig) {
+    SparkDataSourceConfig rightDataSourceConfig = joinConfig.getRightDatasetConfig();
+    SparkDataSource rightDataSource = dataSourceProvider.get(request, rightDataSourceConfig.getDatasourceType());
+
+    if (rightDataSource != null) {
+        Dataset<Row> rightDF = rightDataSource.load(request, rightDataSourceConfig);
+        // Apply filtering if needed
+        if (joinConfig.getFilterRight() != null) {
+            rightDF = rightDF.filter(functions.expr(joinConfig.getFilterRight()));
+        }
+        return rightDF;
+    } else {
+        // Handle error or return an empty DataFrame
+        return sparkSession.emptyDataFrame();
+    }
+}
+
+
+public class SparkMongoDataSource implements SparkDataSource<List<Document>> {
+
+    // ... (existing code)
+
+    @Override
+    public Dataset<Row> Load(final SparkJobRequest request, final List<Document> filter) {
+        // Load the base dataset
+        final SparkDataSourceConfig inputDataSourceConfig = request.getInputDataSource();
+        final SparkDataSource inputDataSource = dataSourceProvider.get(request, inputDataSourceConfig.getDatasourceType());
+
+        if (inputDataSource == null) {
+            // Handle error or return an empty DataFrame
+            return sparkSession.emptyDataFrame();
+        }
+
+        Dataset<Row> baseDF = inputDataSource.load(request, filter);
+
+        // Perform joins with JoinConfig objects
+        for (JoinConfig joinConfig : request.getJoinConfigs()) {
+            Dataset<Row> rightDF = loadRightDatasetForJoin(request, joinConfig);
+
+            if (rightDF != null) {
+                baseDF = performJoin(baseDF, rightDF, joinConfig);
+            }
+        }
+
+        return baseDF;
+    }
+
+    private Dataset<Row> loadRightDatasetForJoin(SparkJobRequest request, JoinConfig joinConfig) {
+        // ... (previous implementation)
+    }
+
+    private Dataset<Row> performJoin(Dataset<Row> leftDF, Dataset<Row> rightDF, JoinConfig joinConfig) {
+        String joinType = joinConfig.getJoinType().toString();
+        String[] joinColumns = joinConfig.getJoinColumns().toArray(new String[0]);
+        
+        // Perform the join operation
+        Dataset<Row> joinedDF = leftDF.join(rightDF, joinColumns, joinType);
+        
+        // Apply HAVING clause if specified
+        if (joinConfig.getHavingClauseRight() != null) {
+            joinedDF = joinedDF.filter(functions.expr(joinConfig.getHavingClauseRight()));
+        }
+        
+        // Apply group by and aggregation
+        if (!joinConfig.getGroupByColumnsRight().isEmpty() || !joinConfig.getAggregateFunctionsRight().isEmpty()) {
+            joinedDF = applyGroupByAndAggregation(joinedDF, joinConfig);
+        }
+        
+        // Apply select columns
+        if (!joinConfig.getSelectColumnsRight().isEmpty()) {
+            joinedDF = applySelectColumns(joinedDF, joinConfig.getSelectColumnsRight());
+        }
+        
+        // Apply filters
+        if (joinConfig.getFilterRight() != null) {
+            joinedDF = joinedDF.filter(functions.expr(joinConfig.getFilterRight()));
+        }
+        
+        return joinedDF;
+    }
+
+    // ... (other methods)
+}
