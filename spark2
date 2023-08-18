@@ -256,3 +256,31 @@ public class SparkMongoDataSourceTest {
         return config;
     }
 }
+
+///////
+correction
+
+
+
+private Dataset<Row> applyGroupByAndAggregation(Dataset<Row> input, JoinConfig joinConfig) {
+    // Group by the specified columns
+    List<Column> groupByCols = joinConfig.getGroupByColumnsRight().stream()
+            .map(input::col)
+            .collect(Collectors.toList());
+
+    // Prepare aggregation expressions
+    List<Column> aggExprs = new ArrayList<>();
+    for (Map.Entry<String, String> entry : joinConfig.getAggregateFunctionsRight().entrySet()) {
+        String colName = entry.getKey();
+        String aggFunc = entry.getValue();
+        Column aggExpr = functions.expr(aggFunc + "(" + colName + ")").as(colName + "_" + aggFunc);
+        aggExprs.add(aggExpr);
+    }
+
+    // Apply aggregation using agg() method
+    Dataset<Row> result = input.groupBy(groupByCols.toArray(new Column[0]))
+            .agg(aggExprs.get(0), JavaConverters.asScalaBuffer(aggExprs.subList(1, aggExprs.size())).toSeq());
+
+    return result;
+}
+
