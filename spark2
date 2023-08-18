@@ -147,3 +147,112 @@ public class SparkMongoDataSource implements SparkDataSource<List<Document>> {
 
     // ... (other methods)
 }
+
+//// Test class////
+import org.apache.spark.sql.*;
+import org.junit.*;
+
+import java.util.*;
+
+public class SparkMongoDataSourceTest {
+
+    private SparkSession spark;
+
+    @Before
+    public void setup() {
+        spark = SparkSession.builder()
+                .appName("SparkMongoDataSourceTest")
+                .master("local[*]")
+                .getOrCreate();
+    }
+
+    @After
+    public void cleanup() {
+        spark.stop();
+    }
+
+    @Test
+    public void testJoinWithConditions() {
+        // Create sample data for base dataset
+        List<Row> baseData = Arrays.asList(
+                RowFactory.create("user1", 100),
+                RowFactory.create("user2", 200)
+        );
+
+        // Create sample data for right datasets
+        List<Row> rightData1 = Arrays.asList(
+                RowFactory.create("user1", 50),
+                RowFactory.create("user2", 75)
+        );
+
+        List<Row> rightData2 = Arrays.asList(
+                RowFactory.create("user1", "A"),
+                RowFactory.create("user2", "B")
+        );
+
+        // Create schemas
+        StructType baseSchema = new StructType()
+                .add("userId", DataTypes.StringType)
+                .add("amount", DataTypes.IntegerType);
+
+        StructType rightSchema1 = new StructType()
+                .add("userId", DataTypes.StringType)
+                .add("bonus", DataTypes.IntegerType);
+
+        StructType rightSchema2 = new StructType()
+                .add("userId", DataTypes.StringType)
+                .add("category", DataTypes.StringType);
+
+        // Create DataFrames
+        Dataset<Row> baseDF = spark.createDataFrame(baseData, baseSchema);
+        Dataset<Row> rightDF1 = spark.createDataFrame(rightData1, rightSchema1);
+        Dataset<Row> rightDF2 = spark.createDataFrame(rightData2, rightSchema2);
+
+        // Create SparkJobRequest
+        SparkJobRequest request = new SparkJobRequest();
+        request.setInputDataSource(new SparkDataSourceConfig());  // Set appropriate config
+        request.addJoinConfig(createJoinConfig1());
+        request.addJoinConfig(createJoinConfig2());
+
+        // Create SparkMongoDataSource
+        SparkMongoDataSource dataSource = new SparkMongoDataSource(/* pass necessary dependencies */);
+
+        // Load the final joined dataset
+        Dataset<Row> result = dataSource.Load(request, null);
+
+        // Show the result
+        result.show();
+    }
+
+    private JoinConfig createJoinConfig1() {
+        JoinConfig config = new JoinConfig(JoinConfig.JoinType.INNER);
+        config.setLeftDataset("base");
+        config.setRightDataset("right1");
+        config.addJoinCondition("userId", "userId", null);
+        config.addSelectColumn("userId");
+        config.addSelectColumn("amount");
+        config.addSelectColumn("bonus");
+        config.addAggregateFunction("amount", "sum");
+        config.addAggregateFunction("bonus", "min");
+        config.addGroupByColumn("userId");
+        config.setFilterRight("bonus > 50");
+        return config;
+    }
+
+    private JoinConfig createJoinConfig2() {
+        JoinConfig config = new JoinConfig(JoinConfig.JoinType.INNER);
+        config.setLeftDataset("result1");
+        config.setRightDataset("right2");
+        config.addJoinCondition("userId", "userId", null);
+        config.addSelectColumn("userId");
+        config.addSelectColumn("amount_sum");
+        config.addSelectColumn("bonus_min");
+        config.addSelectColumn("category");
+        config.addAggregateFunction("amount_sum", "sum");
+        config.addAggregateFunction("bonus_min", "min");
+        config.addGroupByColumn("userId");
+        config.addGroupByColumn("category");
+        config.addHavingClauseRight("sum(amount_sum) > 200");
+        return config;
+    }
+}
