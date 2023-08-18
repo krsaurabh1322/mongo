@@ -94,3 +94,93 @@ public class SparkMongoDataSource implements SparkDataSource<List<Document>> {
                 .join(rightDataset.alias(rightAlias), joinConditions, joinConfig.getJoinType().toString());
     }
 }
+
+/////////
+
+
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+public class JoinConfig {
+    public enum JoinType {
+        INNER, LEFT, RIGHT, FULL
+    }
+
+    private JoinType joinType;
+    private List<JoinCondition> joinConditions;
+    private List<String> groupByColumns;
+    private List<String> selectColumns;
+    private Map<String, String> aggregateFunctions;
+
+    public JoinConfig(JoinType joinType) {
+        this.joinType = joinType;
+        this.joinConditions = new ArrayList<>();
+        this.groupByColumns = new ArrayList<>();
+        this.selectColumns = new ArrayList<>();
+        this.aggregateFunctions = new HashMap<>();
+    }
+
+    public void addJoinCondition(String leftColumn, String rightColumn, String filter) {
+        joinConditions.add(new JoinCondition(leftColumn, rightColumn, filter));
+    }
+
+    public void addGroupByColumn(String columnName) {
+        groupByColumns.add(columnName);
+    }
+
+    public void addSelectColumn(String columnName) {
+        selectColumns.add(columnName);
+    }
+
+    public void addAggregateFunction(String columnName, String aggregateFunction) {
+        aggregateFunctions.put(columnName, aggregateFunction);
+    }
+
+    public JoinType getJoinType() {
+        return joinType;
+    }
+
+    public List<JoinCondition> getJoinConditions() {
+        return joinConditions;
+    }
+
+    public List<String> getGroupByColumns() {
+        return groupByColumns;
+    }
+
+    public List<String> getSelectColumns() {
+        return selectColumns;
+    }
+
+    public Map<String, String> getAggregateFunctions() {
+        return aggregateFunctions;
+    }
+
+    public static class JoinCondition {
+        private String leftColumn;
+        private String rightColumn;
+        private String filter;
+
+        public JoinCondition(String leftColumn, String rightColumn, String filter) {
+            this.leftColumn = leftColumn;
+            this.rightColumn = rightColumn;
+            this.filter = filter;
+        }
+
+        public String getLeftColumn() {
+            return leftColumn;
+        }
+
+        public String getRightColumn() {
+            return rightColumn;
+        }
+
+        public String getFilter() {
+            return filter;
+        }
+    }
+}
+
