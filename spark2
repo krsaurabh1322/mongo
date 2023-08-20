@@ -284,3 +284,48 @@ private Dataset<Row> applyGroupByAndAggregation(Dataset<Row> input, JoinConfig j
     return result;
 }
 
+
+
+///////////
+Mongo DB
+
+
+here are the MongoDB commands to insert data into the respective collections:
+
+1. **Insert Data into 'sales' Collection:**
+
+```javascript
+db.sales.insertOne({
+  _id: 1,
+  customer_id: 101,
+  product_id: 201,
+  amount: 500,
+  bonus: 50,
+  category: "A"
+})
+```
+
+2. **Insert Data into 'customers' Collection:**
+
+```javascript
+db.customers.insertOne({
+  _id: 101,
+  name: "John Doe",
+  age: 30
+})
+```
+
+3. **Insert Data into 'products' Collection:**
+
+```javascript
+db.products.insertOne({
+  _id: 201,
+  name: "Product A",
+  price: 100,
+  category: "A"
+})
+```
+
+Replace the data and values as needed to match your test cases and schema.
+
+
