@@ -329,3 +329,97 @@ db.products.insertOne({
 Replace the data and values as needed to match your test cases and schema.
 
 
+//////////////
+
+
+
+Sure, let's assume the `sales`, `bonus`, and `category` collections are inserted as follows:
+
+1. Insert data into the `sales` collection:
+```javascript
+db.sales.insertMany([
+  { customerId: 1, productId: 101, amount: 100 },
+  { customerId: 1, productId: 102, amount: 150 },
+  { customerId: 2, productId: 101, amount: 200 },
+  { customerId: 3, productId: 103, amount: 50 }
+]);
+```
+
+2. Insert data into the `bonus` collection:
+```javascript
+db.bonus.insertMany([
+  { customerId: 1, bonusAmount: 10 },
+  { customerId: 2, bonusAmount: 15 },
+  { customerId: 4, bonusAmount: 5 }
+]);
+```
+
+3. Insert data into the `category` collection:
+```javascript
+db.category.insertMany([
+  { productId: 101, category: "Electronics" },
+  { productId: 102, category: "Clothing" },
+  { productId: 103, category: "Books" }
+]);
+```
+
+The SQL join query that we are testing here corresponds to the following logic:
+
+```sql
+SELECT
+  s.customerId,
+  c.category,
+  SUM(s.amount) AS totalAmount,
+  SUM(b.bonusAmount) AS totalBonus
+FROM
+  sales s
+INNER JOIN
+  bonus b ON s.customerId = b.customerId
+INNER JOIN
+  category c ON s.productId = c.productId
+GROUP BY
+  s.customerId, c.category;
+```
+
+This query joins the `sales`, `bonus`, and `category` collections based on specified conditions and then performs grouping and aggregation operations to calculate the total amount and total bonus for each customer in each category.
+
+
+
+public static JoinConfig createJoinConfig1() {
+    List<String> joinColumns = new ArrayList<>();
+    joinColumns.add("customerId");
+
+    List<String> selectColumnsRight = new ArrayList<>();
+    selectColumnsRight.add("customerId");
+    selectColumnsRight.add("amount");
+    selectColumnsRight.add("bonusAmount");
+
+    List<String> groupByColumnsRight = new ArrayList<>();
+    groupByColumnsRight.add("customerId");
+
+    Map<String, String> aggregateFunctionsRight = new HashMap<>();
+    aggregateFunctionsRight.put("amount", "sum");
+    aggregateFunctionsRight.put("bonusAmount", "sum");
+
+    return new JoinConfig("sales", "bonus", joinColumns, JoinType.INNER,
+        selectColumnsRight, groupByColumnsRight, aggregateFunctionsRight, null);
+}
+
+public static JoinConfig createJoinConfig2() {
+    List<String> joinColumns = new ArrayList<>();
+    joinColumns.add("productId");
+
+    List<String> selectColumnsRight = new ArrayList<>();
+    selectColumnsRight.add("productId");
+    selectColumnsRight.add("category");
+
+    List<String> groupByColumnsRight = new ArrayList<>();
+    groupByColumnsRight.add("productId");
+
+    Map<String, String> aggregateFunctionsRight = new HashMap<>();
+    aggregateFunctionsRight.put("category", "first");
+
+    return new JoinConfig("sales_bonus", "category", joinColumns, JoinType.INNER,
+        selectColumnsRight, groupByColumnsRight, aggregateFunctionsRight, null);
+}
+
