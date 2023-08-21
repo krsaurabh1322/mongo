@@ -423,3 +423,209 @@ public static JoinConfig createJoinConfig2() {
         selectColumnsRight, groupByColumnsRight, aggregateFunctionsRight, null);
 }
 
+
+
+/////final/////
+
+private Dataset<Row> performJoins(
+    SparkSession sparkSession,
+    SparkJobRequest request,
+    JoinConfig joinConfig,
+    Dataset<Row> baseDataset
+) {
+    Dataset<Row> result = baseDataset;
+
+    for (JoinConfig.JoinCondition joinCondition : joinConfig.getJoinConditions()) {
+        String[] joinCols = getJoinColumns(joinCondition, result, joinConfig);
+        Dataset<Row> rightDataset = loadRightDatasetForJoin(request, joinConfig);
+        
+        String filterConditions = getFilterConditions(joinCondition, rightDataset, joinConfig);
+
+        result = result
+            .join(rightDataset, joinCols, joinType)
+            .filter(filterConditions)
+            .groupBy(getGroupByColumns(joinConfig))
+            .agg(getAggregationExpressions(joinConfig));
+
+        applySelectColumns(result, joinConfig.getSelectColumnsRight());
+    }
+
+    return result;
+}
+
+
+import org.apache.spark.sql.Column;
+import org.apache.spark.sql.Dataset;
+import org.apache.spark.sql.Row;
+import org.apache.spark.sql.SparkSession;
+import static org.apache.spark.sql.functions.*;
+
+public class SparkMongoDataSource {
+    // ... your existing code ...
+
+    private String[] getJoinColumns(
+        JoinConfig.JoinCondition joinCondition,
+        Dataset<Row> leftDataset,
+        JoinConfig joinConfig
+    ) {
+        String leftCol = joinCondition.getLeftColumn();
+        String rightCol = joinCondition.getRightColumn();
+
+        String leftDatasetAlias = getAliasForDataset(leftDataset, joinConfig);
+        String rightDatasetAlias = getAliasForDataset(loadRightDatasetForJoin(request, joinConfig), joinConfig);
+
+        String[] joinCols = new String[]{
+            leftDatasetAlias + "." + leftCol,
+            rightDatasetAlias + "." + rightCol
+        };
+
+        return joinCols;
+    }
+
+    private String getFilterConditions(
+        JoinConfig.JoinCondition joinCondition,
+        Dataset<Row> rightDataset,
+        JoinConfig joinConfig
+    ) {
+        // Combine filter conditions from both joinConfig and joinCondition
+        String joinFilter = joinCondition.getFilter();
+        String rightFilter = joinConfig.getFilterRight();
+
+        if (joinFilter != null && !joinFilter.isEmpty()) {
+            joinFilter = "(" + joinFilter + ")";
+        }
+
+        if (rightFilter != null && !rightFilter.isEmpty()) {
+            if (joinFilter != null && !joinFilter.isEmpty()) {
+                joinFilter = joinFilter + " AND ";
+            }
+            joinFilter = "(" + rightFilter + ")";
+        }
+
+        String rightDatasetAlias = getAliasForDataset(rightDataset, joinConfig);
+
+        return joinFilter.replaceAll("right\\.", rightDatasetAlias + ".");
+    }
+
+    private String getAliasForDataset(Dataset<Row> dataset, JoinConfig joinConfig) {
+        // Generate a unique alias for the dataset
+        return "ds_" + dataset.hashCode();
+    }
+
+    private String[] getGroupByColumns(JoinConfig joinConfig) {
+        return joinConfig.getGroupByColumns().toArray(new String[0]);
+    }
+
+    private Column[] getAggregationExpressions(JoinConfig joinConfig) {
+        return joinConfig.getAggregateFunctions().entrySet().stream()
+            .map(entry -> {
+                String columnName = entry.getKey();
+                String aggregateFunction = entry.getValue();
+                return expr(aggregateFunction + "(" + columnName + ") as " + columnName);
+            })
+            .toArray(Column[]::new);
+    }
+}
+
+
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+public class JoinConfig {
+    public enum JoinType {
+        INNER, LEFT, RIGHT, FULL
+    }
+
+    private JoinType joinType;
+    private List<JoinCondition> joinConditions;
+    private List<String> groupByColumns;
+    private List<String> selectColumns;
+    private Map<String, String> aggregateFunctions;
+
+    // New fields for filters on right dataset
+    private String filterRight;
+
+    public JoinConfig(JoinType joinType) {
+        this.joinType = joinType;
+        this.joinConditions = new ArrayList<>();
+        this.groupByColumns = new ArrayList<>();
+        this.selectColumns = new ArrayList<>();
+        this.aggregateFunctions = new HashMap<>();
+    }
+
+    public void addJoinCondition(String leftColumn, String rightColumn, String filter) {
+        joinConditions.add(new JoinCondition(leftColumn, rightColumn, filter));
+    }
+
+    // Other methods...
+
+    public String getFilterRight() {
+        return filterRight;
+    }
+
+    public void setFilterRight(String filterRight) {
+        this.filterRight = filterRight;
+    }
+
+    public static class JoinCondition {
+        private String leftColumn;
+        private String rightColumn;
+        private String filter;
+
+        public JoinCondition(String leftColumn, String rightColumn, String filter) {
+            this.leftColumn = leftColumn;
+            this.rightColumn = rightColumn;
+            this.filter = filter;
+        }
+
+        public String getLeftColumn() {
+            return leftColumn;
+        }
+
+        public String getRightColumn() {
+            return rightColumn;
+        }
+
+        public String getFilter() {
+            return filter;
+        }
+    }
+}
+
+
+public class SparkMongoDataSource {
+    // ... other methods ...
+
+    private Column getFilterCondition(
+        JoinConfig.JoinCondition joinCondition,
+        Dataset<Row> rightDataset,
+        JoinConfig joinConfig
+    ) {
+        String joinFilter = joinCondition.getFilter();
+        String rightFilter = joinConfig.getFilterRight();
+
+        if (joinFilter != null && !joinFilter.isEmpty()) {
+            joinFilter = "(" + joinFilter + ")";
+        }
+
+        if (rightFilter != null && !rightFilter.isEmpty()) {
+            if (joinFilter != null && !joinFilter.isEmpty()) {
+                joinFilter = joinFilter + " AND ";
+            }
+            joinFilter = "(" + rightFilter + ")";
+        }
+
+        return expr(joinFilter);
+    }
+
+    private String getAliasForDataset(Dataset<Row> dataset, JoinConfig joinConfig) {
+        // ... unchanged ...
+    }
+}
+
+
+
+
