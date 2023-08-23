@@ -715,3 +715,30 @@ public class JoinConfig {
 
 
 
+///////
+
+
+private Dataset<Row> performJoins(Dataset<Row> baseDataset, JoinConfig joinConfig) {
+    Dataset<Row> result = baseDataset;
+    
+    for (JoinCondition condition : joinConfig.getJoinConditions()) {
+        List<Column> joinExpr = new ArrayList<>();
+        
+        for (int i = 0; i < condition.getLeftColumns().size(); i++) {
+            joinExpr.add(
+                col(condition.getLeftColumns().get(i))
+                    .equalTo(col(condition.getRightColumns().get(i)))
+            );
+        }
+        
+        result = result.join(
+            loadRightDatasetForJoin(request, joinConfig.getRightDataset()),
+            functions.expr(JavaConverters.collectionAsScalaIterableConverter(joinExpr).asScala().toSeq()),
+            joinConfig.getJoinType().toString()
+        );
+    }
+
+    return result;
+}
+
+
