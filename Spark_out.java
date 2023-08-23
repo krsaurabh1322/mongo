@@ -1,4 +1,4 @@
-Let's enhance the classes to support various types of joins in the Spark DataFrame caching mechanism. 
+noLet's enhance the classes to support various types of joins in the Spark DataFrame caching mechanism. 
 We'll start with the `SparkJobRequest` class, and then proceed to update other classes accordingly.
 
 1. Update `SparkJobRequest` class to include join information of all types of joins:
@@ -765,3 +765,16 @@ public class SparkMongoDataSourceTest {
     // ... Other test methods ...
 }
 
+
+
+private String getAliasForDataset(String datasetName) {
+    return datasetName.toLowerCase(); // You can adjust the alias generation logic as needed
+}
+
+private String getColumnWithAliases(String datasetAlias, String column) {
+    return datasetAlias + "." + column; // Assumes columns in the dataset have unique names
+}
+
+private String applyAliasToFilter(String filter, String datasetAlias) {
+    return filter.replaceAll("([\\w.]+)(\\s*(=|>|<|>=|<=|!=)\\s*([\\w']+))", datasetAlias + ".$1$2$3$4");
+}
