@@ -831,3 +831,44 @@ private String applyAliasToFilter(String filter, String leftDatasetName, String 
 
     return modifiedFilter.toString().trim();
 }
+
+
+// Load the right dataset and alias all columns
+private Dataset<Row> loadRightDatasetForJoin(SparkSession spark, SparkJobRequest request, JoinConfig joinConfig) {
+    // Load the right dataset
+    Dataset<Row> rightDataset = loadDatasetFromMongo(spark, joinConfig.getRightDataset());
+
+    // Alias all columns in the right dataset
+    rightDataset = aliasColumns(rightDataset, rightDataset.columns(), rightDataset.alias(rightDatasetAlias));
+
+    return rightDataset;
+}
+
+// Apply joins, filters, group by, etc., and alias columns in result
+private Dataset<Row> performJoin(List<JoinConfig> joinConfigs, Dataset<Row> baseDataset) {
+    Dataset<Row> result = baseDataset;
+
+    for (JoinConfig joinConfig : joinConfigs) {
+        // Load the right dataset and apply alias
+        Dataset<Row> rightDataset = loadRightDatasetForJoin(spark, request, joinConfig);
+
+        // Apply joins, filters, group by, etc.
+        result = result.join(rightDataset, buildJoinCondition(joinConfig), joinConfig.getJoinType().toString())
+                       .where(applyFilter(joinConfig.getFilter()))
+                       .groupBy(applyGroupBy(joinConfig.getGroupByColumns()))
+                       .agg(applyAggregations(joinConfig.getAggregateFunctions()));
+
+        // Alias columns in the result
+        result = aliasColumns(result, result.columns(), result.alias(resultAlias));
+    }
+
+    return result;
+}
+
+// Alias columns in a dataset
+private Dataset<Row> aliasColumns(Dataset<Row> dataset, String[] columns, String alias) {
+    for (String column : columns) {
+        dataset = dataset.withColumnRenamed(column, getColumnWithAliases(column, alias));
+    }
+    return dataset;
+}
