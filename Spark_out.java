@@ -584,4 +584,184 @@ In this example, make sure to replace `"path_to_inquiry_table_orc"` and `"path_t
   Counterparty ORC tables, respectively. Also, ensure that the join column name `"counterpartyId"` and other columns used for filtering and aggregation 
   are present in the respective tables. The `output_path_orc` should be replaced with the desired output directory where the aggregated DataFrame will be 
   saved in ORC format.  
+
+
+
+public class JoinConfig {
+    public enum JoinType {
+        INNER, LEFT, RIGHT, FULL
+    }
+
+    private String leftDataset;
+    private String rightDataset;
+    private JoinType joinType;
+    private List<JoinGroup> joinGroups;
+    private String filter;
+    private String filterRight;
+    private List<String> selectColumns;
+    private List<String> groupByColumns;
+    private String havingClause;
+    private Map<String, String> aggregateFunctions;
+
+    // Constructors, getters, setters, etc.
+}
+
+public class JoinGroup {
+    public enum LogicalOperator {
+        AND, OR
+    }
+
+    private LogicalOperator logicalOperator;
+    private List<JoinOn> joinOns;
+
+    public JoinGroup(LogicalOperator logicalOperator) {
+        this.logicalOperator = logicalOperator;
+        this.joinOns = new ArrayList<>();
+    }
+
+    public void addJoinOn(JoinOn joinOn) {
+        joinOns.add(joinOn);
+    }
+
+    public List<JoinOn> getJoinOns() {
+        return joinOns;
+    }
+
+    public LogicalOperator getLogicalOperator() {
+        return logicalOperator;
+    }
+}
+
+
+
+private Dataset<Row> performJoin(Dataset<Row> baseDataset, List<JoinConfig> joinConfigs) {
+    Dataset<Row> finalDataset = baseDataset;
+
+    for (JoinConfig joinConfig : joinConfigs) {
+        String leftAlias = getAliasForDataset(joinConfig.getLeftDataset());
+        String rightAlias = getAliasForDataset(joinConfig.getRightDataset());
+
+        List<String> leftColumns = new ArrayList<>();
+        List<String> rightColumns = new ArrayList<>();
+        List<String> joinExpressions = new ArrayList<>();
+
+        for (JoinGroup joinGroup : joinConfig.getJoinGroups()) {
+            List<String> groupConditions = new ArrayList<>();
+
+            for (JoinOn joinOn : joinGroup.getJoinOns()) {
+                String leftCol = getColumnWithAliases(joinOn.getLeftColumn(), leftAlias);
+                String rightCol = getColumnWithAliases(joinOn.getRightColumn(), rightAlias);
+                String operator = joinOn.getOperator();
+
+                groupConditions.add(String.format("(%s %s %s)", leftCol, operator, rightCol));
+            }
+
+            String groupCondition = String.join(" " + joinGroup.getLogicalOperator() + " ", groupConditions);
+            joinExpressions.add("(" + groupCondition + ")");
+        }
+
+        String joinExpression = String.join(" AND ", joinExpressions);
+
+        Dataset<Row> rightDataset = loadRightDatasetForJoin(joinConfig.getRightDataset());
+        Dataset<Row> joinedDataset = finalDataset.join(rightDataset, functions.expr(joinExpression), joinConfig.getJoinType().toString());
+
+        if (joinConfig.getSelectColumns() != null && !joinConfig.getSelectColumns().isEmpty()) {
+            List<String> selectCols = new ArrayList<>();
+            for (String col : joinConfig.getSelectColumns()) {
+                String aliasCol = getColumnWithAliases(col, rightAlias);
+                selectCols.add(aliasCol);
+            }
+            joinedDataset = joinedDataset.selectExpr(selectCols.toArray(new String[0]));
+        }
+
+        if (joinConfig.getFilter() != null) {
+            String filterExpression = applyAliasToFilter(joinConfig.getFilter(), rightAlias);
+            joinedDataset = joinedDataset.filter(filterExpression);
+        }
+
+        if (joinConfig.getGroupByColumns() != null && !joinConfig.getGroupByColumns().isEmpty()) {
+            List<String> groupByCols = new ArrayList<>();
+            for (String col : joinConfig.getGroupByColumns()) {
+                String aliasCol = getColumnWithAliases(col, rightAlias);
+                groupByCols.add(aliasCol);
+            }
+            joinedDataset = joinedDataset.groupBy(groupByCols.stream().toArray(String[]::new)).agg(aggregateFunctions(joinConfig.getAggregateFunctions()));
+        }
+
+        if (joinConfig.getHavingClause() != null) {
+            String havingExpression = applyAliasToFilter(joinConfig.getHavingClause(), rightAlias);
+            joinedDataset = joinedDataset.having(havingExpression);
+        }
+
+        if (finalDataset != baseDataset) {
+            finalDataset.unpersist();
+        }
+
+        finalDataset = joinedDataset.cache();
+    }
+
+    return finalDataset;
+}
   
+
+
+public class SparkMongoDataSourceTest {
+    // ... Other test methods ...
+
+    @Test
+    public void testPerformJoinWithDifferentJoinConfigs() {
+        // Create a list of JoinGroups for a JoinConfig
+        List<JoinGroup> joinGroups = new ArrayList<>();
+        
+        // Create JoinOns for the first JoinGroup
+        List<JoinOn> joinOns1 = new ArrayList<>();
+        joinOns1.add(JoinOn.builder()
+                .leftColumn("t1.a1")
+                .rightColumn("t2.b1")
+                .operator("=")
+                .build());
+        joinOns1.add(JoinOn.builder()
+                .leftColumn("t1.a2")
+                .rightColumn("t2.b2")
+                .operator(">")
+                .build());
+        JoinGroup joinGroup1 = JoinGroup.builder()
+                .joinOns(joinOns1)
+                .logicalOperator("AND")
+                .build();
+        
+        // Create JoinOns for the second JoinGroup
+        List<JoinOn> joinOns2 = new ArrayList<>();
+        joinOns2.add(JoinOn.builder()
+                .leftColumn("t1.c1")
+                .rightColumn("t2.d1")
+                .operator("=")
+                .build());
+        JoinGroup joinGroup2 = JoinGroup.builder()
+                .joinOns(joinOns2)
+                .logicalOperator("AND")
+                .build();
+        
+        // Create the JoinConfig
+        JoinConfig joinConfig = JoinConfig.builder()
+                .leftDataset("table t1")
+                .rightDataset("table t2")
+                .joinType(JoinType.INNER)
+                .joinGroups(joinGroups)
+                .filter("t1.someColumn = 123")
+                .groupByColumns(Arrays.asList("t1.groupColumn"))
+                .selectColumns(Arrays.asList("t1.a1", "t1.c1", "t2.d1"))
+                .aggregateFunctions(new HashMap<>())
+                .build();
+        
+        // Print the string representation of the query
+        String queryString = JoinConfigTranslator.buildQuery(joinConfig);
+        System.out.println(queryString);
+        
+        // Perform necessary assertions
+        // ...
+    }
+    
+    // ... Other test methods ...
+}
+
