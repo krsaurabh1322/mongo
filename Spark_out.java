@@ -798,3 +798,36 @@ private String getAliasForDataset(String datasetName) {
     }
     return datasetName.toLowerCase();
 }
+
+
+private String applyAliasToFilter(String filter, String leftDatasetName, String rightDatasetName) {
+    if (filter == null || filter.isEmpty()) {
+        return filter;
+    }
+
+    String[] filterParts = filter.split(" ");
+    StringBuilder modifiedFilter = new StringBuilder();
+
+    for (String part : filterParts) {
+        if (part.contains(".")) {
+            String[] columnParts = part.split("\\.");
+            if (columnParts.length == 2) {
+                String datasetAlias = columnParts[0].toLowerCase();
+                String columnName = columnParts[1];
+                if (datasetAlias.equals(leftDatasetName)) {
+                    modifiedFilter.append(getColumnWithAliases(columnName, leftDatasetName)).append(" ");
+                } else if (datasetAlias.equals(rightDatasetName)) {
+                    modifiedFilter.append(getColumnWithAliases(columnName, rightDatasetName)).append(" ");
+                } else {
+                    modifiedFilter.append(part).append(" ");
+                }
+            } else {
+                modifiedFilter.append(part).append(" ");
+            }
+        } else {
+            modifiedFilter.append(part).append(" ");
+        }
+    }
+
+    return modifiedFilter.toString().trim();
+}
