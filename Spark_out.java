@@ -790,3 +790,11 @@ private String getColumnWithAliases(String columnName, Dataset<Row> dataset) {
         return dataset.col(columnName).expr().toString();
     }
 }
+
+
+private String getAliasForDataset(String datasetName) {
+    if (datasetName.contains(".")) {
+        return datasetName.substring(0, datasetName.indexOf(".")).toLowerCase();
+    }
+    return datasetName.toLowerCase();
+}
