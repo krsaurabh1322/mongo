@@ -778,3 +778,15 @@ private String getColumnWithAliases(String datasetAlias, String column) {
 private String applyAliasToFilter(String filter, String datasetAlias) {
     return filter.replaceAll("([\\w.]+)(\\s*(=|>|<|>=|<=|!=)\\s*([\\w']+))", datasetAlias + ".$1$2$3$4");
 }
+
+
+
+private String getColumnWithAliases(String columnName, Dataset<Row> dataset) {
+    if (columnName.contains(".")) {
+        String datasetAlias = getAliasForDataset(columnName);
+        String colWithoutAlias = columnName.substring(columnName.indexOf(".") + 1);
+        return datasetAlias + "." + colWithoutAlias;
+    } else {
+        return dataset.col(columnName).expr().toString();
+    }
+}
