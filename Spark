@@ -494,3 +494,35 @@ public class SparkMongoDataSourceTest {
         resultDataFrame.show();
     }
 }
+
+
+
+
+
+
+public static String applyAliasToFilter(String filterExpression, String leftAlias, String rightAlias) {
+    String[] filterParts = filterExpression.split("(?i)(\\s+AND\\s+|\\s+OR\\s+)"); // Split by AND or OR
+    List<String> aliasedConditions = new ArrayList<>();
+
+    for (String condition : filterParts) {
+        String[] conditionParts = condition.split("(?i)(=|>|<|>=|<=|!=)"); // Split by comparison operator
+        List<String> aliasedColumns = new ArrayList<>();
+
+        for (String part : conditionParts) {
+            String aliasedPart = part;
+
+            // Apply aliasing if the part is a column
+            if (!part.contains("_")) {
+                aliasedPart = (leftColumns.contains(part) ? leftAlias : rightAlias) + "." + part;
+            }
+
+            aliasedColumns.add(aliasedPart);
+        }
+
+        // Reconstruct the condition with aliased columns
+        aliasedConditions.add(String.join(" ", aliasedColumns));
+    }
+
+    // Reconstruct the filter expression with aliased conditions and appropriate AND/OR
+    return String.join(" AND ", aliasedConditions);
+}
