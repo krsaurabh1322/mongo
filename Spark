@@ -526,3 +526,58 @@ public static String applyAliasToFilter(String filterExpression, String leftAlia
     // Reconstruct the filter expression with aliased conditions and appropriate AND/OR
     return String.join(" AND ", aliasedConditions);
 }
+
+
+
+public Dataset<Row> performJoin(List<JoinConfig> joinConfigs, Dataset<Row> baseDataset) {
+    List<JoinConfig> aliasedJoinConfigs = aliasJoinConfigs(joinConfigs);
+
+    Dataset<Row> joinedDataset = baseDataset;
+
+    for (JoinConfig joinConfig : aliasedJoinConfigs) {
+        // Rest of your existing code for performing the join, filter, group by, etc.
+        // No need for further aliasing as joinConfig columns are already aliased
+    }
+
+    return joinedDataset;
+}
+
+private List<JoinConfig> aliasJoinConfigs(List<JoinConfig> joinConfigs) {
+    List<JoinConfig> aliasedJoinConfigs = new ArrayList<>();
+
+    for (JoinConfig joinConfig : joinConfigs) {
+        aliasedJoinConfigs.add(aliasJoinConfig(joinConfig));
+    }
+
+    return aliasedJoinConfigs;
+}
+
+private JoinConfig aliasJoinConfig(JoinConfig joinConfig) {
+    String leftAlias = joinConfig.getLeftDataset().toLowerCase();
+    String rightAlias = joinConfig.getRightDataset().toLowerCase();
+
+    // Alias joinOn conditions
+    List<JoinGroup> aliasedJoinGroups = new ArrayList<>();
+    for (JoinGroup joinGroup : joinConfig.getJoinGroups()) {
+        aliasedJoinGroups.add(aliasJoinGroup(joinGroup, leftAlias, rightAlias));
+    }
+
+    // Alias filter
+    String aliasedFilter = null;
+    if (joinConfig.getFilter() != null) {
+        aliasedFilter = applyAliasToFilter(joinConfig.getFilter(), leftAlias, rightAlias);
+    }
+
+    // Create a new JoinConfig with aliased columns
+    return JoinConfig.builder()
+        .leftDataset(leftAlias)
+        .rightDataset(rightAlias)
+        .joinType(joinConfig.getJoinType())
+        .joinGroups(aliasedJoinGroups)
+        .filter(aliasedFilter)
+        .selectColumns(joinConfig.getSelectColumns())
+        .groupByColumns(joinConfig.getGroupByColumns())
+        .havingClause(joinConfig.getHavingClause())
+        .aggregateFunctions(joinConfig.getAggregateFunctions())
+        .build();
+}
