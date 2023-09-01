@@ -1,4 +1,4 @@
-Schema design for versioning and historical records in MongoDB
+jiSchema design for versioning and historical records in MongoDB
 
 A single collection for both the main data and the historical records.
 By using a separate version field and a history array, we can track the document's changes over time 
@@ -162,3 +162,14 @@ This information is updated/incremented with each update.
 As this scenario falls under a data warehouse concept called Slowly Changing Dimension (SCD), we apply the Type 2 SCD solution here. 
 When the value of an attribute changes, the current record is closed and a new record is created with the changed data values and this 
 new record becomes the current record. Each record contains the startdate time and closedate time to identify the time period between which the record was active. 
+
+
+output = "NULL^NULL^NULL^NULL"
+
+# Remove "NULL" at the start and end
+if output.startswith("NULL^"):
+    output = output[len("NULL^"):]
+if output.endswith("^NULL"):
+    output = output[:-len("^NULL")]
+
+print(output)
