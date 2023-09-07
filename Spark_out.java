@@ -1125,3 +1125,147 @@ public class JsonFlattenerUtils {
         return resultMaps;
     }
 }
+
+
+
+////////
+
+
+import com.jayway.jsonpath.JsonPath;
+import com.jayway.jsonpath.PathNotFoundException;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParseException;
+
+public class JsonPathUtility {
+    public static JsonObject getJsonObject(String jsonData, String jsonPath) {
+        try {
+            Object result = JsonPath.read(jsonData, jsonPath);
+            if (result instanceof JsonObject) {
+                return (JsonObject) result;
+            }
+        } catch (PathNotFoundException e) {
+            // Handle path not found exception
+        }
+        return null;
+    }
+
+    public static JsonArray getJsonArray(String jsonData, String jsonPath) {
+        try {
+            Object result = JsonPath.read(jsonData, jsonPath);
+            if (result instanceof JsonArray) {
+                return (JsonArray) result;
+            }
+        } catch (PathNotFoundException e) {
+            // Handle path not found exception
+        }
+        return null;
+    }
+
+    public static String getString(String jsonData, String jsonPath) {
+        try {
+            Object result = JsonPath.read(jsonData, jsonPath);
+            if (result instanceof String) {
+                return (String) result;
+            }
+        } catch (PathNotFoundException e) {
+            // Handle path not found exception
+        }
+        return null;
+    }
+
+    public static Integer getInteger(String jsonData, String jsonPath) {
+        try {
+            String stringValue = getString(jsonData, jsonPath);
+            if (stringValue != null) {
+                return Integer.parseInt(stringValue);
+            }
+        } catch (NumberFormatException e) {
+            // Handle conversion exception
+        }
+        return null;
+    }
+
+    public static Double getDouble(String jsonData, String jsonPath) {
+        try {
+            String stringValue = getString(jsonData, jsonPath);
+            if (stringValue != null) {
+                return Double.parseDouble(stringValue);
+            }
+        } catch (NumberFormatException e) {
+            // Handle conversion exception
+        }
+        return null;
+    }
+
+    public static Boolean getBoolean(String jsonData, String jsonPath) {
+        try {
+            String stringValue = getString(jsonData, jsonPath);
+            if (stringValue != null) {
+                return Boolean.parseBoolean(stringValue);
+            }
+        } catch (NumberFormatException e) {
+            // Handle conversion exception
+        }
+        return null;
+    }
+}
+
+
+
+
+<dependency>
+    <groupId>com.jayway.jsonpath</groupId>
+    <artifactId>json-path</artifactId>
+    <version>[your-jsonpath-version]</version>
+</dependency>
+
+
+
+
+import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.*;
+
+public class JsonPathUtilityTest {
+    private static final String jsonData = "{\"name\":\"John\",\"scores\":[100, 95, 88],\"rating\":\"8.5\",\"isStudent\":true}";
+
+    @Test
+    public void testGetJsonObject() {
+        assertNotNull(JsonPathUtility.getJsonObject(jsonData, "$"));
+        assertNull(JsonPathUtility.getJsonObject(jsonData, "$.nonexistent"));
+    }
+
+    @Test
+    public void testGetJsonArray() {
+        assertNotNull(JsonPathUtility.getJsonArray(jsonData, "$.scores"));
+        assertNull(JsonPathUtility.getJsonArray(jsonData, "$.nonexistent"));
+    }
+
+    @Test
+    public void testGetString() {
+        assertEquals("John", JsonPathUtility.getString(jsonData, "$.name"));
+        assertNull(JsonPathUtility.getString(jsonData, "$.nonexistent"));
+    }
+
+    @Test
+    public void testGetInteger() {
+        assertEquals(100, JsonPathUtility.getInteger(jsonData, "$.scores[0]"));
+        assertNull(JsonPathUtility.getInteger(jsonData, "$.scores[3]"));
+        assertNull(JsonPathUtility.getInteger(jsonData, "$.rating"));
+        assertNull(JsonPathUtility.getInteger(jsonData, "$.nonexistent"));
+    }
+
+    @Test
+    public void testGetDouble() {
+        assertEquals(8.5, JsonPathUtility.getDouble(jsonData, "$.rating"));
+        assertNull(JsonPathUtility.getDouble(jsonData, "$.name"));
+        assertNull(JsonPathUtility.getDouble(jsonData, "$.nonexistent"));
+    }
+
+    @Test
+    public void testGetBoolean() {
+        assertTrue(JsonPathUtility.getBoolean(jsonData, "$.isStudent"));
+        assertNull(JsonPathUtility.getBoolean(jsonData, "$.name"));
+        assertNull(JsonPathUtility.getBoolean(jsonData, "$.nonexistent"));
+    }
+}
