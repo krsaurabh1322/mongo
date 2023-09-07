@@ -872,3 +872,49 @@ private Dataset<Row> aliasColumns(Dataset<Row> dataset, String[] columns, String
     }
     return dataset;
 }
+
+
+
+///////
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import java.io.IOException;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.Map;
+
+public class JsonFlattener {
+    private final ObjectMapper objectMapper;
+
+    public JsonFlattener() {
+        this.objectMapper = new ObjectMapper();
+    }
+
+    public Map<String, Object> flattenJson(String jsonData) throws IOException {
+        JsonNode jsonNode = objectMapper.readTree(jsonData);
+        return flattenJson("", jsonNode);
+    }
+
+    private Map<String, Object> flattenJson(String currentPath, JsonNode jsonNode) {
+        Map<String, Object> result = new HashMap<>();
+
+        if (jsonNode.isObject()) {
+            Iterator<Map.Entry<String, JsonNode>> fields = jsonNode.fields();
+            while (fields.hasNext()) {
+                Map.Entry<String, JsonNode> entry = fields.next();
+                String newPath = currentPath.isEmpty() ? entry.getKey() : currentPath + "." + entry.getKey();
+                result.putAll(flattenJson(newPath, entry.getValue()));
+            }
+        } else if (jsonNode.isArray()) {
+            for (int i = 0; i < jsonNode.size(); i++) {
+                String newPath = currentPath + "[" + i + "]";
+                result.putAll(flattenJson(newPath, jsonNode.get(i)));
+            }
+        } else {
+            result.put(currentPath, jsonNode.asText());
+        }
+
+        return result;
+    }
+}
