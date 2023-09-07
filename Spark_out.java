@@ -1042,3 +1042,35 @@ Map<String, Object> extractedMap = JsonFlattenerUtils.getMapAtLevel(flattenedMap
 for (Map.Entry<String, Object> entry : extractedMap.entrySet()) {
     System.out.println(entry.getKey() + ": " + entry.getValue());
 }
+
+
+
+
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+public class JsonFlattenerUtils {
+    public static List<Map<String, Object>> getMapsAtLevel(Map<String, Object> flattenedMap, int level) {
+        List<Map<String, Object>> resultMaps = new ArrayList<>();
+        Map<String, Object> currentMap = new HashMap<>();
+        int currentLevel = -1;
+
+        for (Map.Entry<String, Object> entry : flattenedMap.entrySet()) {
+            String[] keyParts = entry.getKey().split("\\.");
+            if (keyParts.length > level) {
+                if (currentLevel != level) {
+                    currentMap = new HashMap<>();
+                    resultMaps.add(currentMap);
+                    currentLevel = level;
+                }
+                currentMap.put(keyParts[level], entry.getValue());
+            }
+        }
+
+        return resultMaps;
+    }
+}
+
