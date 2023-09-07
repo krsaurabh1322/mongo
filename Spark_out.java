@@ -1269,3 +1269,94 @@ public class JsonPathUtilityTest {
         assertNull(JsonPathUtility.getBoolean(jsonData, "$.nonexistent"));
     }
 }
+
+
+//////
+
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+
+public class JsonPathUtility {
+    private final JsonNode jsonData;
+
+    public JsonPathUtility(String jsonData) {
+        try {
+            ObjectMapper objectMapper = new ObjectMapper();
+            this.jsonData = objectMapper.readTree(jsonData);
+        } catch (Exception e) {
+            // Handle JSON parsing exception
+            throw new IllegalArgumentException("Invalid JSON data");
+        }
+    }
+
+    public String getString(String jsonPath) {
+        try {
+            String[] pathSegments = jsonPath.split("\\.");
+            JsonNode currentNode = jsonData;
+            for (String pathSegment : pathSegments) {
+                if (currentNode.isObject() && currentNode.has(pathSegment)) {
+                    currentNode = currentNode.get(pathSegment);
+                } else {
+                    // Handle path not found exception
+                    return null;
+                }
+            }
+            if (currentNode.isTextual()) {
+                return currentNode.asText();
+            }
+        } catch (Exception e) {
+            // Handle exceptions
+        }
+        return null;
+    }
+
+    // ... (other methods remain the same)
+}
+
+
+
+
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+
+public class JsonPathUtilityTest {
+    private JsonPathUtility jsonPathUtility;
+
+    @BeforeEach
+    public void setUp() {
+        String jsonData = "{\"name\":\"John\",\"age\":30,\"address\":{\"city\":\"New York\",\"zipcode\":\"10001\"}}";
+        jsonPathUtility = new JsonPathUtility(jsonData);
+    }
+
+    @Test
+    public void testGetStringExistingPath() {
+        String result = jsonPathUtility.getString("name");
+        assertEquals("John", result);
+    }
+
+    @Test
+    public void testGetStringNestedPath() {
+        String result = jsonPathUtility.getString("address.city");
+        assertEquals("New York", result);
+    }
+
+    @Test
+    public void testGetStringNonexistentPath() {
+        String result = jsonPathUtility.getString("nonexistent");
+        assertNull(result);
+    }
+
+    @Test
+    public void testGetStringNonexistentNestedPath() {
+        String result = jsonPathUtility.getString("address.nonexistent");
+        assertNull(result);
+    }
+}
+
