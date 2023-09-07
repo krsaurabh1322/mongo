@@ -1360,3 +1360,49 @@ public class JsonPathUtilityTest {
     }
 }
 
+
+
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+
+public class JsonPathUtility {
+    private final JsonNode jsonData;
+
+    public JsonPathUtility(String jsonData) {
+        try {
+            ObjectMapper objectMapper = new ObjectMapper();
+            this.jsonData = objectMapper.readTree(jsonData);
+        } catch (Exception e) {
+            // Handle JSON parsing exception
+            throw new IllegalArgumentException("Invalid JSON data");
+        }
+    }
+
+    public String getString(String jsonPath, String filterField, String filterValue) {
+        try {
+            String[] pathSegments = jsonPath.split("\\.");
+            JsonNode currentNode = jsonData;
+            for (String pathSegment : pathSegments) {
+                if (currentNode.isObject() && currentNode.has(pathSegment)) {
+                    currentNode = currentNode.get(pathSegment);
+                } else {
+                    // Handle path not found exception
+                    return null;
+                }
+            }
+            if (currentNode.isObject() && currentNode.has(filterField)) {
+                JsonNode filteredNode = currentNode.get(filterField);
+                if (filteredNode.isTextual() && filterValue.equals(filteredNode.asText())) {
+                    return filteredNode.asText();
+                }
+            }
+        } catch (Exception e) {
+            // Handle exceptions
+        }
+        return null;
+    }
+
+    // ... (other methods remain the same)
+}
