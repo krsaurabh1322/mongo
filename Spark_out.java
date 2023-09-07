@@ -1,4 +1,4 @@
-noLet's enhance the classes to support various types of joins in the Spark DataFrame caching mechanism. 
+nonoLet's enhance the classes to support various types of joins in the Spark DataFrame caching mechanism. 
 We'll start with the `SparkJobRequest` class, and then proceed to update other classes accordingly.
 
 1. Update `SparkJobRequest` class to include join information of all types of joins:
@@ -971,4 +971,74 @@ public class JsonFlattener {
 
         return result;
     }
+}
+
+
+//////
+
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+
+public class JsonFlattenerUtils {
+    public static List<Object> getValuesByKey(Map<String, Object> flattenedMap, String key) {
+        List<Object> values = new ArrayList<>();
+
+        for (Map.Entry<String, Object> entry : flattenedMap.entrySet()) {
+            if (entry.getKey().equals(key)) {
+                values.add(entry.getValue());
+            }
+        }
+
+        return values;
+    }
+}
+
+
+
+import java.util.HashMap;
+import java.util.Map;
+
+public class JsonFlattenerUtils {
+    public static Map<String, Object> getMapAtLevel(Map<String, Object> flattenedMap, int level) {
+        Map<String, Object> resultMap = new HashMap<>();
+
+        for (Map.Entry<String, Object> entry : flattenedMap.entrySet()) {
+            String[] keyParts = entry.getKey().split("\\.");
+            if (keyParts.length > level) {
+                resultMap.put(keyParts[level], entry.getValue());
+            }
+        }
+
+        return resultMap;
+    }
+}
+
+
+
+String jsonData = "{\"name\":\"John\",\"address\":{\"city\":\"New York\",\"zip\":10001}}";
+JsonFlattener jsonFlattener = new JsonFlattener();
+Map<String, Object> flattenedMap = jsonFlattener.flattenJson(jsonData);
+
+String keyToFind = "address.city";
+List<Object> valuesForKey = JsonFlattenerUtils.getValuesByKey(flattenedMap, keyToFind);
+
+for (Object value : valuesForKey) {
+    System.out.println(value);
+}
+
+
+
+
+
+String jsonData = "{\"name\":\"John\",\"address\":{\"city\":\"New York\",\"zip\":10001}}";
+JsonFlattener jsonFlattener = new JsonFlattener();
+Map<String, Object> flattenedMap = jsonFlattener.flattenJson(jsonData);
+
+int levelToExtract = 1; // Specify the level you want to extract (0 for top-level)
+Map<String, Object> extractedMap = JsonFlattenerUtils.getMapAtLevel(flattenedMap, levelToExtract);
+
+for (Map.Entry<String, Object> entry : extractedMap.entrySet()) {
+    System.out.println(entry.getKey() + ": " + entry.getValue());
 }
