@@ -1074,3 +1074,54 @@ public class JsonFlattenerUtils {
     }
 }
 
+
+
+
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+public class JsonFlattenerUtils {
+    public static List<Map<String, Object>> getMapsAtLevel(Map<String, Object> flattenedMap, int level) {
+        List<Map<String, Object>> resultMaps = new ArrayList<>();
+        Map<String, Object> currentMap = new HashMap<>();
+        String previousKey = "";
+
+        for (Map.Entry<String, Object> entry : flattenedMap.entrySet()) {
+            String[] keyParts = entry.getKey().split("\\.");
+
+            // Check if we've reached the desired level
+            if (keyParts.length > level) {
+                String currentKey = keyParts[level];
+                if (!currentKey.equals(previousKey)) {
+                    // A new map is starting at this level, so add the previous map to the result list
+                    if (!currentMap.isEmpty()) {
+                        resultMaps.add(currentMap);
+                    }
+                    currentMap = new HashMap<>();
+                }
+
+                // Handle list indicator "[]"
+                if (currentKey.endsWith("[]")) {
+                    currentKey = currentKey.substring(0, currentKey.length() - 2);
+                    List<Map<String, Object>> listMap = (List<Map<String, Object>>) currentMap.getOrDefault(currentKey, new ArrayList<>());
+                    listMap.add(new HashMap<>());
+                    currentMap.put(currentKey, listMap);
+                } else {
+                    currentMap.put(currentKey, entry.getValue());
+                }
+
+                previousKey = currentKey;
+            }
+        }
+
+        // Add the last map to the result list if not empty
+        if (!currentMap.isEmpty()) {
+            resultMaps.add(currentMap);
+        }
+
+        return resultMaps;
+    }
+}
