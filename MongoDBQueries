@@ -189,3 +189,28 @@ public class SparkJoinProcessorTest {
         // Create and return a mock UnionConfig
     }
 }
+
+
+
+<build>
+    <plugins>
+        <plugin>
+            <groupId>org.jsonschema2pojo</groupId>
+            <artifactId>jsonschema2pojo-maven-plugin</artifactId>
+            <version>1.1.1</version> <!-- Use the latest version -->
+            <configuration>
+                <sourceDirectory>${project.basedir}/src/main/resources</sourceDirectory>
+                <targetPackage>com.example.generated</targetPackage>
+                <generateBuilders>true</generateBuilders>
+                <generateToString>true</generateToString>
+            </configuration>
+            <executions>
+                <execution>
+                    <goals>
+                        <goal>generate</goal>
+                    </goals>
+                </execution>
+            </executions>
+        </plugin>
+    </plugins>
+</build>
