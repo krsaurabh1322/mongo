@@ -24,3 +24,168 @@ while preserving the original CSV format.
 Remember to back up your data before running any commands that modify files, and test the command on a sample CSV file to ensure it works as expected for your 
 specific use case.
 
+
+
+
+import org.apache.spark.sql.Dataset;
+import org.apache.spark.sql.Row;
+import org.apache.spark.sql.SparkSession;
+import org.apache.spark.sql.types.DataTypes;
+import org.apache.spark.sql.types.StructField;
+import org.apache.spark.sql.types.StructType;
+
+public class MockDatasets {
+
+    public static Dataset<Row> createFacilityDataset(SparkSession spark) {
+        StructType schema = new StructType(new StructField[]{
+                new StructField("FacilityID", DataTypes.IntegerType, false, null),
+                new StructField("FacilityName", DataTypes.StringType, true, null)
+        });
+
+        return spark.createDataFrame(
+                spark.sparkContext().parallelize(
+                        java.util.Arrays.asList(
+                                new org.apache.spark.sql.catalyst.expressions.GenericRowWithSchema(
+                                        new Object[]{1, "Facility 1"}, schema),
+                                new org.apache.spark.sql.catalyst.expressions.GenericRowWithSchema(
+                                        new Object[]{2, "Facility 2"}, schema)
+                        )
+                ), schema);
+    }
+
+    public static Dataset<Row> createLimitDataset(SparkSession spark) {
+        StructType schema = new StructType(new StructField[]{
+                new StructField("LimitID", DataTypes.IntegerType, false, null),
+                new StructField("Amount", DataTypes.DoubleType, true, null)
+        });
+
+        return spark.createDataFrame(
+                spark.sparkContext().parallelize(
+                        java.util.Arrays.asList(
+                                new org.apache.spark.sql.catalyst.expressions.GenericRowWithSchema(
+                                        new Object[]{1, 1000.0}, schema),
+                                new org.apache.spark.sql.catalyst.expressions.GenericRowWithSchema(
+                                        new Object[]{2, 2000.0}, schema)
+                        )
+                ), schema);
+    }
+
+    public static Dataset<Row> createCounterpartyDataset(SparkSession spark) {
+        StructType schema = new StructType(new StructField[]{
+                new StructField("CounterpartyID", DataTypes.IntegerType, false, null),
+                new StructField("CounterpartyName", DataTypes.StringType, true, null)
+        });
+
+        return spark.createDataFrame(
+                spark.sparkContext().parallelize(
+                        java.util.Arrays.asList(
+                                new org.apache.spark.sql.catalyst.expressions.GenericRowWithSchema(
+                                        new Object[]{1, "Counterparty 1"}, schema),
+                                new org.apache.spark.sql.catalyst.expressions.GenericRowWithSchema(
+                                        new Object[]{2, "Counterparty 2"}, schema)
+                        )
+                ), schema);
+    }
+}
+
+import static org.junit.Assert.*;
+import static org.mockito.Mockito.*;
+
+import org.apache.spark.sql.*;
+import org.apache.spark.sql.functions;
+import org.junit.Before;
+import org.junit.Test;
+import org.mockito.Mock;
+import org.mockito.MockitoAnnotations;
+
+public class SparkJoinProcessorTest {
+    @Mock
+    private SparkSession sparkSession;
+
+    private SparkJoinProcessor sparkJoinProcessor;
+
+    @Before
+    public void setUp() {
+        MockitoAnnotations.initMocks(this);
+        sparkJoinProcessor = new SparkJoinProcessor(new LoggerFactory(), new SparkDataFrameCacheManager(sparkSession));
+    }
+
+    @Test
+    public void testPerformJoin() {
+        // Mock the input request, joinConfig, leftDataset, Facility dataset
+        SparkJobRequest request = createMockRequest();
+        JoinConfig joinConfig = createMockJoinConfig();
+        Dataset<Row> leftDataset = createMockLeftDataset();
+        Dataset<Row> facilityDataset = createMockFacilityDataset();
+
+        when(request.getJoinConfig()).thenReturn(joinConfig);
+        when(sparkSession.createDataFrame(any(), any())).thenReturn(leftDataset, facilityDataset);
+
+        // Call the method
+        Dataset<Row> result = sparkJoinProcessor.performJoin(request);
+
+        // Add assertions based on your expected results
+        assertNotNull(result);
+        // Add more specific assertions for the result dataset
+    }
+
+    @Test
+    public void testPerformUnion() {
+        // Mock the input request, unionConfig, leftDataset, Facility dataset
+        SparkJobRequest request = createMockRequest();
+        UnionConfig unionConfig = createMockUnionConfig();
+        Dataset<Row> leftDataset = createMockLeftDataset();
+        Dataset<Row> facilityDataset = createMockFacilityDataset();
+
+        when(request.getUnionConfig()).thenReturn(unionConfig);
+        when(sparkSession.createDataFrame(any(), any())).thenReturn(leftDataset, facilityDataset);
+
+        // Call the method
+        Dataset<Row> result = sparkJoinProcessor.performUnion(request);
+
+        // Add assertions based on your expected results
+        assertNotNull(result);
+        // Add more specific assertions for the result dataset
+    }
+
+    @Test
+    public void testPerformRecursiveOperation() {
+        // Implement test for performRecursiveOperation
+    }
+
+    @Test
+    public void testPerformSingleJoin() {
+        // Implement test for performSingleJoin
+    }
+
+    @Test
+    public void testApplyTransformation() {
+        // Implement test for applyTransformation
+    }
+
+    @Test
+    public void testGetJoinExpression() {
+        // Implement test for getJoinExpression
+    }
+
+    // Create mock objects or use your actual test data for these methods
+    private SparkJobRequest createMockRequest() {
+        // Create and return a mock request
+    }
+
+    private JoinConfig createMockJoinConfig() {
+        // Create and return a mock JoinConfig
+    }
+
+    private Dataset<Row> createMockLeftDataset() {
+        // Create and return a mock left dataset
+    }
+
+    private Dataset<Row> createMockFacilityDataset() {
+        // Create and return a mock Facility dataset
+    }
+
+    private UnionConfig createMockUnionConfig() {
+        // Create and return a mock UnionConfig
+    }
+}
