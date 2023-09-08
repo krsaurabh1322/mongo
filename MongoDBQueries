@@ -214,3 +214,22 @@ public class SparkJoinProcessorTest {
         </plugin>
     </plugins>
 </build>
+
+
+import java.util.Optional;
+
+Optional<YourGeneratedClass> optionalObject = Optional.ofNullable(yourObject);
+
+optionalObject.ifPresent(obj -> {
+    String name = obj.getName();
+    String age = obj.getAge();
+
+    System.out.println("Name: " + name);
+    System.out.println("Age: " + age);
+});
+
+// Handle the case where 'yourObject' is null
+optionalObject.orElseGet(() -> {
+    System.out.println("Object is null");
+    return new YourGeneratedClass(); // Return a default object if needed
+});
