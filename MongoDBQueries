@@ -233,3 +233,40 @@ optionalObject.orElseGet(() -> {
     System.out.println("Object is null");
     return new YourGeneratedClass(); // Return a default object if needed
 });
+
+
+
+import org.junit.Test;
+import java.util.HashMap;
+import java.util.Map;
+
+import static org.junit.Assert.assertEquals;
+
+public class SparkJobRequestTest {
+
+    @Test
+    public void testClone() {
+        // Create a sample SparkJobRequest
+        SparkJobRequest originalRequest = SparkJobRequest.builder()
+                .uniqueRequestId("originalRequestId")
+                .inputDataSource(SparkDataSourceConfig.builder()
+                        .dataSourceType("inputDataSourceType")
+                        .dataSourceConfig(new HashMap<>())
+                        .build())
+                .outputDataSource(SparkDataSourceConfig.builder()
+                        .dataSourceType("outputDataSourceType")
+                        .dataSourceConfig(new HashMap<>())
+                        .build())
+                .build();
+
+        // Clone the original SparkJobRequest with a new input collection name
+        String inputCollectionName = "newCollectionName";
+        SparkJobRequest clonedRequest = originalRequest.clone(inputCollectionName);
+
+        // Verify that the cloned request is correctly created
+        assertEquals(originalRequest.getUniqueRequestId() + "_" + inputCollectionName, clonedRequest.getUniqueRequestId());
+        assertEquals(inputCollectionName, clonedRequest.getInputDataSource().getDataSourceConfig().get(DataSourceParamKey.INPUT_COLLECTION_NAME));
+        assertEquals(originalRequest.getOutputDataSource().getDataSourceType(), clonedRequest.getOutputDataSource().getDataSourceType());
+        assertEquals(originalRequest.getOutputDataSource().getDataSourceConfig(), clonedRequest.getOutputDataSource().getDataSourceConfig());
+    }
+}
