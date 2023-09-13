@@ -658,3 +658,58 @@ class TestMongoServerUri(unittest.TestCase):
 if __name__ == '__main__':
     unittest.main()
 
+
+
+
+///////////
+
+import com.solacesystems.jcsmp.*;
+import org.junit.Before;
+import org.junit.Test;
+import org.mockito.Mock;
+import org.mockito.MockitoAnnotations;
+
+import java.io.BufferedReader;
+import java.io.FileReader;
+
+import static org.mockito.Mockito.*;
+
+public class SolaceMessageConsumerTest {
+    @Mock
+    private JCSMPSession jcsmpSession;
+
+    @Before
+    public void setUp() {
+        MockitoAnnotations.initMocks(this);
+    }
+
+    @Test
+    public void testOnReceiveWithTestData() throws Exception {
+        // Read test data from a file
+        String testDataFile = "path/to/test/data.xml";
+        StringBuilder testData = new StringBuilder();
+        try (BufferedReader reader = new BufferedReader(new FileReader(testDataFile))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                testData.append(line);
+            }
+        }
+
+        // Create a SolaceMessageConsumer instance with the mock JCSMPSession
+        SolaceMessageConsumer consumer = new SolaceMessageConsumer(jcsmpSession, "your-queue-name");
+
+        // Create a mock BytesXMLMessage
+        BytesXMLMessage mockMessage = mock(BytesXMLMessage.class);
+
+        // Mock the behavior of the mockMessage
+        when(mockMessage.getXMLContent()).thenReturn(testData.toString());
+
+        // Simulate the onReceive method call
+        consumer.onReceive(mockMessage);
+
+        // Add assertions or verifications based on your onReceive logic
+        // For example, you can verify that processMessage is called and message is acked
+        verify(mockMessage).getXMLContent();
+        verify(jcsmpSession).acknowledge(eq(mockMessage));
+    }
+}
