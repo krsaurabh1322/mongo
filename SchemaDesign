@@ -173,3 +173,82 @@ if output.endswith("^NULL"):
     output = output[:-len("^NULL")]
 
 print(output)
+
+
+
+//////////////
+
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.JsonProcessingException;
+import org.junit.Before;
+import org.junit.Test;
+import org.mockito.Mock;
+import org.mockito.MockitoAnnotations;
+
+import static org.junit.Assert.*;
+import static org.mockito.Mockito.*;
+
+public class ObjectMapperUtilsTest {
+
+    @Mock
+    private ObjectMapperProvider objectMapperProvider;
+
+    @Mock
+    private Logger logger;
+
+    @Before
+    public void setUp() {
+        MockitoAnnotations.initMocks(this);
+    }
+
+    @Test
+    public void convertToObject_validJson_returnObject() {
+        String jsonData = "{\"name\":\"John\",\"age\":30}";
+        TypeReference<User> valueTypeRef = new TypeReference<User>() {};
+        ObjectMapper objectMapper = new ObjectMapper();
+
+        // Configure ObjectMapperProvider to return a mock ObjectMapper
+        when(objectMapperProvider.get()).thenReturn(objectMapper);
+
+        User user = new User("John", 30);
+
+        try {
+            String userJson = objectMapper.writeValueAsString(user);
+
+            // Mock ObjectMapper readValue to return the user object
+            when(objectMapper.readValue(jsonData, valueTypeRef)).thenReturn(user);
+
+            User result = ObjectMapperUtils.convertToObject(jsonData, valueTypeRef, objectMapperProvider, logger);
+
+            assertEquals(user, result);
+        } catch (JsonProcessingException e) {
+            fail("Unexpected JsonProcessingException");
+        }
+
+        verify(logger, never()).warn(anyString(), anyString(), any(JsonProcessingException.class));
+    }
+
+    @Test
+    public void convertToObject_invalidJson_returnNull() {
+        String jsonData = "InvalidJson";
+        TypeReference<User> valueTypeRef = new TypeReference<User>() {};
+        ObjectMapper objectMapper = new ObjectMapper();
+
+        // Configure ObjectMapperProvider to return a mock ObjectMapper
+        when(objectMapperProvider.get()).thenReturn(objectMapper);
+
+        try {
+            // Mock ObjectMapper readValue to throw a JsonProcessingException (simulate invalid JSON)
+            when(objectMapper.readValue(jsonData, valueTypeRef)).thenThrow(JsonProcessingException.class);
+
+            User result = ObjectMapperUtils.convertToObject(jsonData, valueTypeRef, objectMapperProvider, logger);
+
+            assertNull(result);
+        } catch (JsonProcessingException e) {
+            fail("Unexpected JsonProcessingException");
+        }
+
+        verify(logger).warn(anyString(), anyString(), any(JsonProcessingException.class));
+    }
+}
