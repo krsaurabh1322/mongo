@@ -260,3 +260,9 @@ public class ObjectMapperUtilsTest {
             dateTime = dateTime.withHour(0).withMinute(0).withSecond(0).withNano(0);
             return dateTime;
         };
+
+
+LocalDate date = LocalDate.parse(dateString, formatter.withChronology((localDateTime) -> {
+            LocalDateTime adjustedDateTime = localDateTime.with(timeZeroAdjuster);
+            return adjustedDateTime;
+        }));
