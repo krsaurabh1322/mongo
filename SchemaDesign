@@ -266,3 +266,13 @@ LocalDate date = LocalDate.parse(dateString, formatter.withChronology((localDate
             LocalDateTime adjustedDateTime = localDateTime.with(timeZeroAdjuster);
             return adjustedDateTime;
         }));
+
+
+
+// Mock the behavior of ObjectMapperUtils
+        when(ObjectMapperUtils.convertToObject(
+                anyString(),
+                any(TypeReference.class),
+                any(ObjectMapperProvider.class),
+                any(Logger.class)
+        )).thenReturn(new BPSIRSRMASchema()); // Mock a valid BPSIRSRMASchema
