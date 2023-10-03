@@ -276,3 +276,69 @@ LocalDate date = LocalDate.parse(dateString, formatter.withChronology((localDate
                 any(ObjectMapperProvider.class),
                 any(Logger.class)
         )).thenReturn(new BPSIRSRMASchema()); // Mock a valid BPSIRSRMASchema
+
+
+
+////////
+
+
+---
+
+## Application Architecture Overview
+
+Our application architecture is built around a repository interface that abstracts interactions with various data sources. The application utilizes Hazelcast for distributed caching, enhancing read performance and maintaining data consistency. The cache employs the Entity Follower pattern to synchronize with the underlying MongoDB database.
+
+### Key Components:
+
+1. **Repository Interface:**
+   - Abstracts interactions with various data sources, such as MongoDB, file systems, or in-memory data.
+
+2. **Hazelcast Cache:**
+   - Serves as a distributed cache to improve read performance.
+   - Implements the Entity Follower pattern to stay synchronized with updates from the MongoDB database.
+
+3. **MongoDB Implementation:**
+   - Provides the underlying data source implementation for MongoDB interactions.
+   - Uses the Hazelcast cache to ensure data consistency.
+
+---
+
+## Entity Follower Pattern with Hazelcast
+
+The Entity Follower pattern ensures that the cache (Hazelcast) closely mirrors the data stored in the MongoDB database. Here's how this is implemented:
+
+1. **Cache Initialization:**
+   - Upon application startup, Hazelcast initializes a cache to store data.
+  
+2. **Load Data from MongoDB:**
+   - The cache is initially populated with data fetched from the MongoDB database using the repository interface.
+
+3. **Entity Follower Setup:**
+   - Hazelcast utilizes the Entity Follower pattern to observe updates in the MongoDB database.
+   - Whenever the MongoDB database is updated, an event triggers a cache update in Hazelcast to keep the cache in sync.
+
+4. **Synchronization Process:**
+   - Updates in the MongoDB database (inserts, updates, deletes) trigger appropriate events.
+   - These events are captured, and the corresponding data in Hazelcast is updated accordingly to reflect the changes.
+
+5. **Read Operations:**
+   - Whenever a read operation is requested, Hazelcast is queried first.
+   - If the data is present in the cache, it's returned, improving read performance.
+   - If not, the repository interface fetches the data from the MongoDB database, updates the cache, and then returns the data.
+
+---
+
+## Usage of Repository Interface
+
+1. **Connecting to Data Source:**
+   - The repository interface provides a unified way to connect to different data sources based on the application's needs.
+
+2. **Abstracting Data Access:**
+   - Through the repository interface, the application abstracts the complexities of interacting with various data sources (MongoDB, file systems, in-memory data).
+
+3. **Consistent Data Access:**
+   - Regardless of the underlying data source, the repository interface ensures consistent data access and manipulation by using Hazelcast for caching and synchronization.
+
+---
+
+This architecture and implementation design allow our application to achieve high read performance, data consistency, and seamless integration with various data sources, enabling a flexible and efficient data access layer.
