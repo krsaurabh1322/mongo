@@ -1,4 +1,4 @@
-Since modules in Python are singletons (imported only once), you can access the same logger instance from other modules 
+jiSince modules in Python are singletons (imported only once), you can access the same logger instance from other modules 
 after it's set up in the main module.
 
 
@@ -713,3 +713,15 @@ public class SolaceMessageConsumerTest {
         verify(jcsmpSession).acknowledge(eq(mockMessage));
     }
 }
+
+//////
+
+
+1. Taken ownership of multiple modules in loanshub as lead developer and on track to deliver commercial go live for strategy tracker and poseidon principles.
+2. Also contributed in credit trading books(as secondary developer) and other various modules in loanshub such as UWR.
+3. Always been available to others in the team to provide any help to them in achieving the team goals. 
+4. Worked as a release master for multiple cfdm releases and also helped other team members with conducting their releases.
+5. Proactively resolved any prod or QA testing issues even if i am not the person incharge.
+6. I started the year only working as a java developer to create CAT loanshub apps, but later on when given the opportunity to work on cfdm side of loanshub, i had to expand my knowledge and learn new skills to successfully deliver the tasks given to me. And now i have become one of the primary person of contact for any cfdm related tasks or issues.
+7.Improved my knowledge related to business and end to end technical working of the team(control-m, scripts, ETLs etc) so that i can actively part of design discussions and provide my contribution.
+8.Always tried my best to abide by my commitments and ensure I remain dedicated towards the completion of tasks on time with minimal bugs or rework in all situations.
