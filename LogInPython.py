@@ -1,4 +1,4 @@
-jiSince modules in Python are singletons (imported only once), you can access the same logger instance from other modules 
+SWjiSince modules in Python are singletons (imported only once), you can access the same logger instance from other modules 
 after it's set up in the main module.
 
 
@@ -725,3 +725,18 @@ public class SolaceMessageConsumerTest {
 6. I started the year only working as a java developer to create CAT loanshub apps, but later on when given the opportunity to work on cfdm side of loanshub, i had to expand my knowledge and learn new skills to successfully deliver the tasks given to me. And now i have become one of the primary person of contact for any cfdm related tasks or issues.
 7.Improved my knowledge related to business and end to end technical working of the team(control-m, scripts, ETLs etc) so that i can actively part of design discussions and provide my contribution.
 8.Always tried my best to abide by my commitments and ensure I remain dedicated towards the completion of tasks on time with minimal bugs or rework in all situations.
+
+
+
+rephrased
+
+
+
+1. Displayed exceptional leadership as the lead developer, taking charge of multiple modules in LoansHub and making significant strides towards the successful commercial deployment for Strategy Tracker and Poseidon Principles.
+2. Notably contributed to various modules within LoansHub, including Credit Trading Books as a secondary developer, and played a vital role in the development of UWR.
+3. Demonstrated unwavering support for fellow team members, readily offering assistance to ensure collective progress towards team objectives.
+4. Excelled in the role of a release master for multiple CFDM releases and extended valuable aid to teammates in conducting their releases.
+5. Proactively addressed production and QA testing issues, showcasing a proactive approach to problem-solving, even beyond designated responsibilities.
+6. Embarked on the year primarily as a Java developer for CAT LoansHub apps. However, seized the opportunity to expand knowledge and acquire new skills for successful engagement in CFDM tasks, evolving into a key point of contact for all CFDM-related matters.
+7. Strengthened expertise in business knowledge and end-to-end technical processes of the team, actively participating in design discussions and providing valuable contributions.
+8. Exhibited a strong commitment to task completion, consistently meeting deadlines with minimal errors or rework, and upholding a dedicated approach towards fulfilling all commitments.
