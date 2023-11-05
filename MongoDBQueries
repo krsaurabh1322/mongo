@@ -308,3 +308,60 @@ Best regards,
 ---
 
 Feel free to adapt this version to suit your requirements and the nuances of your team's culture.
+
+
+
+///////
+
+
+const fs = require('fs');
+const csv = require('csv-parser');
+const MongoClient = require('mongodb').MongoClient;
+
+// MongoDB connection URL
+const url = 'mongodb://localhost:27017';
+const dbName = 'your-database-name';
+const collectionName = 'your-collection-name';
+
+// Load the CSV file with mappings
+const mappings = [];
+fs.createReadStream('mapping.csv')
+  .pipe(csv())
+  .on('data', (row) => {
+    mappings.push(row);
+  })
+  .on('end', () => {
+    // Connect to the MongoDB database
+    MongoClient.connect(url, { useNewUrlParser: true }, (err, client) => {
+      if (err) throw err;
+
+      const db = client.db(dbName);
+      const collection = db.collection(collectionName);
+
+      // Iterate through each mapping
+      mappings.forEach((mapping) => {
+        const dealId = mapping.dealId;
+        const oldProductId = mapping.old_productId;
+        const newProductId = mapping.new_productId;
+        const newDocumentId = `${dealId}_${newProductId}`;
+
+        // Find the document with the old productId and dealId
+        const query = { dealId: dealId, productId: oldProductId };
+        collection.findOne(query, (err, doc) => {
+          if (err) throw err;
+
+          if (doc) {
+            // Create a new document with the updated productId and _id
+            const newDoc = { _id: newDocumentId, dealId: dealId, productId: newProductId, ...doc };
+
+            // Insert the new document with the updated _id
+            collection.insertOne(newDoc, (err, result) => {
+              if (err) throw err;
+            });
+          }
+        });
+      });
+
+      client.close();
+    });
+  });
