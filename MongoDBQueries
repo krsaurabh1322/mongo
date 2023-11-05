@@ -449,3 +449,11 @@ for (var i = 1; i < rows.length; i++) { // Skip the header row
     db.yourCollectionName.insert(newDocument);
   }
 }
+
+
+///
+
+
+db.sourceCollection.find().forEach(function(doc) {
+    db.targetCollection.insert(doc);
+});
