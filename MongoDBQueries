@@ -1,4 +1,7 @@
 
+
+
+
 mongoexport --db your_database --collection your_collection --type csv --fields field1,field2,field3 --out output_file.csv
 awk 'BEGIN { FPAT = "([^,]*)|(\"[^\"]+\")" } { for (i = 1; i <= NF; i++) gsub(",", "^", $i) } 1' OFS=, output_file.csv > temp_file.csv && mv temp_file.csv output_file.csv
 
@@ -365,3 +368,44 @@ fs.createReadStream('mapping.csv')
       client.close();
     });
   });
+
+
+
+///////
+
+
+
+// Load the CSV file with mappings
+var mappings = [];
+var fileContent = cat('mapping.csv'); // Read the CSV file
+
+// Split the CSV content into rows
+var rows = fileContent.split('\n');
+for (var i = 1; i < rows.length; i++) { // Skip the header row
+  var columns = rows[i].split(',');
+  var dealId = columns[0].trim();
+  var oldProductId = columns[1].trim();
+  var newProductId = columns[2].trim();
+  
+  // Find the existing document with the old _id
+  var existingDocument = db.yourCollectionName.findOne({ _id: dealId + '_' + oldProductId });
+
+  if (existingDocument) {
+    // Create a new document based on the mapping
+    var newDocument = {
+      _id: dealId + '_' + newProductId, // Set the new _id
+      dealId: dealId,
+      productId: newProductId
+    };
+
+    // Copy all fields from the existing document to the new document
+    for (var key in existingDocument) {
+      if (existingDocument.hasOwnProperty(key) && key !== '_id') {
+        newDocument[key] = existingDocument[key];
+      }
+    }
+
+    // Insert the new document into the collection
+    db.yourCollectionName.insert(newDocument);
+  }
+}
