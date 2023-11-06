@@ -1,0 +1,78 @@
+To add the checkpointing feature to your existing consumer classes with minimal changes and make it plug-and-play, you can follow an approach where you create a separate `CheckpointManager` class that handles checkpointing and provides a callback mechanism. This way, your existing consumer classes can use the `CheckpointManager` without needing significant modifications.
+
+Here's how you can structure your code:
+
+1. **CheckpointManager Class**:
+
+   Create a `CheckpointManager` class that handles checkpoint creation, storage, and callback mechanism. This class will encapsulate the checkpointing logic and provide a clean interface for your consumers.
+
+   ```java
+   public class CheckpointManager {
+       private MongoCollection<Document> checkpointCollection;
+       private CheckpointCallback callback;
+
+       public CheckpointManager(MongoCollection<Document> checkpointCollection, CheckpointCallback callback) {
+           this.checkpointCollection = checkpointCollection;
+           this.callback = callback;
+       }
+
+       public void createCheckpoint(String checkpointName, long eventId) {
+           Document checkpoint = new Document("checkpointName", checkpointName)
+                   .append("lastProcessedId", eventId);
+
+           checkpointCollection.insertOne(checkpoint, (result, t) -> {
+               if (t == null) {
+                   // Checkpoint is successfully stored in MongoDB
+                   // Trigger the checkpoint confirmation callback
+                   callback.onCheckpointComplete();
+               } else {
+                   // Handle MongoDB error
+               }
+           });
+       }
+   }
+   ```
+
+2. **CheckpointCallback Interface**:
+
+   Define a `CheckpointCallback` interface that your consumer classes will implement. This interface will specify the `onCheckpointComplete` method.
+
+   ```java
+   public interface CheckpointCallback {
+       void onCheckpointComplete();
+   }
+   ```
+
+3. **Consumer Class**:
+
+   Modify your existing consumer classes to implement the `CheckpointCallback` interface. Inject the `CheckpointManager` into the consumer class. When an event is processed, call the `createCheckpoint` method, which will, in turn, trigger the callback when the checkpoint is complete.
+
+   ```java
+   public class YourConsumerClass implements CheckpointCallback {
+       private CheckpointManager checkpointManager;
+
+       public YourConsumerClass(MongoCollection<Document> checkpointCollection) {
+           checkpointManager = new CheckpointManager(checkpointCollection, this);
+       }
+
+       public void consumeEvent(Event event) {
+           // Process the event
+
+           // Capture the event ID or other relevant data
+           long eventId = extractEventId(event);
+
+           // Perform checkpointing
+           checkpointManager.createCheckpoint("solace_event", eventId);
+
+           // Continue processing and respond to Solace
+       }
+
+       @Override
+       public void onCheckpointComplete() {
+           // This method will be called when the checkpoint is confirmed
+           // You can proceed with sending the response to Solace or any other action.
+       }
+   }
+   ```
+
+This approach allows your existing consumer classes to remain mostly unchanged. You only need to implement the `CheckpointCallback` interface and inject the `CheckpointManager`. The `CheckpointManager` class encapsulates the checkpointing logic and makes it easy to integrate checkpointing into your existing consumers in a plug-and-play manner.
