@@ -336,3 +336,47 @@ public class YourTestClass {
 
     // Add more test cases for different scenarios as needed
 }
+
+
+/////
+
+import java.util.*;
+import java.util.function.Function;
+
+public Map<String, DealProduct> loadAllSyndicatedUnderwrittenDealProducts() {
+    List<Function<DealProduct, String>> attributeExtractors = Arrays.asList(
+        DealProduct::getTypeOfLoan,
+        DealProduct::getUwStatus
+        // Add more attributes as needed
+    );
+
+    return StreamSupport.stream(
+        dealProductRepository.whereDirect()
+            .eq(DealProduct.FUNDING_ARRANGEMENT, SYNDICATED)
+            .eq(DealProduct.DISTRIBUTION_METHOD, UNDERWRITTEN)
+            .fetch()
+            .spliterator(), false)
+        .collect(
+            toMap(
+                DealProduct::getDealId,
+                identity(),
+                (dp1, dp2) -> mergeDealProducts(dp1, dp2, attributeExtractors)
+            )
+        );
+}
+
+private DealProduct mergeDealProducts(DealProduct dp1, DealProduct dp2, List<Function<DealProduct, String>> attributeExtractors) {
+    for (Function<DealProduct, String> extractor : attributeExtractors) {
+        String attr1 = extractor.apply(dp1);
+        String attr2 = extractor.apply(dp2);
+        if (!attr1.isEmpty() && !attr2.isEmpty()) {
+            // Both have non-empty attribute, proceed to the next
+            continue;
+        } else if (!attr1.isEmpty() || !attr2.isEmpty()) {
+            // Keep the one with non-empty attribute
+            return !attr1.isEmpty() ? dp1 : dp2;
+        }
+    }
+    // If none of the attributes are non-empty, keep the one with the latest date
+    return dp1.getDate().isAfter(dp2.getDate()) ? dp1 : dp2;
+}
