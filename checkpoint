@@ -76,3 +76,44 @@ Here's how you can structure your code:
    ```
 
 This approach allows your existing consumer classes to remain mostly unchanged. You only need to implement the `CheckpointCallback` interface and inject the `CheckpointManager`. The `CheckpointManager` class encapsulates the checkpointing logic and makes it easy to integrate checkpointing into your existing consumers in a plug-and-play manner.
+
+
+////
+
+public Map<String, DealProduct> loadAllsyndicatedUnderwrittenDealProducts() {
+    return StreamSupport.stream(
+            dealProductRepository.whereDirect()
+                    .eq(DealProduct.FUNDING_ARRANGEMENT, SYNDICATED)
+                    .eq(DealProduct.DISTRIBUTION_METHOD, UNDERWRITTEN)
+                    .fetch()
+                    .spliterator(), false)
+            .collect(
+                    toMap(
+                            DealProduct::getDealId,
+                            identity(),
+                            (dp1, dp2) -> {
+                                // Custom merge function
+                                if (!StringUtils.isEmpty(dp1.getTypeOfLoan()) || !StringUtils.isEmpty(dp2.getTypeOfLoan())) {
+                                    // Keep the one with non-empty typeOfLoan
+                                    return StringUtils.isEmpty(dp1.getTypeOfLoan()) ? dp2 : dp1;
+                                } else if (!StringUtils.isEmpty(dp1.getUwStatus()) || !StringUtils.isEmpty(dp2.getUwStatus())) {
+                                    // Keep the one with non-empty uwStatus
+                                    return StringUtils.isEmpty(dp1.getUwStatus()) ? dp2 : dp1;
+                                } else {
+                                    // Priority to the one with the latest date, or the one with a date if both have a date defined
+                                    if (!StringUtils.isEmpty(dp2.getDate()) && !StringUtils.isEmpty(dp1.getDate())) {
+                                        if (dp2.getDate().isAfter(dp1.getDate())) {
+                                            return dp2;
+                                        } else {
+                                            return dp1;
+                                        }
+                                    } else if (!StringUtils.isEmpty(dp2.getDate())) {
+                                        return dp2;
+                                    } else {
+                                        return dp1;
+                                    }
+                                }
+                            }
+                    )
+            );
+}
