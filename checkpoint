@@ -80,6 +80,7 @@ This approach allows your existing consumer classes to remain mostly unchanged. 
 
 ////
 
+              
 public Map<String, DealProduct> loadAllsyndicatedUnderwrittenDealProducts() {
     return StreamSupport.stream(
             dealProductRepository.whereDirect()
@@ -91,29 +92,91 @@ public Map<String, DealProduct> loadAllsyndicatedUnderwrittenDealProducts() {
                     toMap(
                             DealProduct::getDealId,
                             identity(),
-                            (dp1, dp2) -> {
-                                // Custom merge function
-                                if (!StringUtils.isEmpty(dp1.getTypeOfLoan()) || !StringUtils.isEmpty(dp2.getTypeOfLoan())) {
-                                    // Keep the one with non-empty typeOfLoan
-                                    return StringUtils.isEmpty(dp1.getTypeOfLoan()) ? dp2 : dp1;
-                                } else if (!StringUtils.isEmpty(dp1.getUwStatus()) || !StringUtils.isEmpty(dp2.getUwStatus())) {
-                                    // Keep the one with non-empty uwStatus
-                                    return StringUtils.isEmpty(dp1.getUwStatus()) ? dp2 : dp1;
-                                } else {
-                                    // Priority to the one with the latest date, or the one with a date if both have a date defined
-                                    if (!StringUtils.isEmpty(dp2.getDate()) && !StringUtils.isEmpty(dp1.getDate())) {
-                                        if (dp2.getDate().isAfter(dp1.getDate())) {
-                                            return dp2;
-                                        } else {
-                                            return dp1;
-                                        }
-                                    } else if (!StringUtils.isEmpty(dp2.getDate())) {
-                                        return dp2;
-                                    } else {
-                                        return dp1;
-                                    }
-                                }
-                            }
+                            this::mergeDealProducts
                     )
             );
 }
+
+private DealProduct mergeDealProducts(DealProduct dp1, DealProduct dp2) {
+    if (!StringUtils.isEmpty(dp1.getTypeOfLoan()) || !StringUtils.isEmpty(dp2.getTypeOfLoan())) {
+        // Keep the one with non-empty typeOfLoan
+        return StringUtils.isEmpty(dp1.getTypeOfLoan()) ? dp2 : dp1;
+    } else if (!StringUtils.isEmpty(dp1.getUwStatus()) || !StringUtils.isEmpty(dp2.getUwStatus())) {
+        // Keep the one with non-empty uwStatus
+        return StringUtils.isEmpty(dp1.getUwStatus()) ? dp2 : dp1;
+    } else {
+        // Priority to the one with the latest date, or the one with a date if both have a date defined
+        if (!StringUtils.isEmpty(dp2.getDate()) && !StringUtils.isEmpty(dp1.getDate())) {
+            if (dp2.getDate().isAfter(dp1.getDate())) {
+                return dp2;
+            } else {
+                return dp1;
+            }
+        } else if (!StringUtils.isEmpty(dp2.getDate())) {
+            return dp2;
+        } else {
+            return dp1;
+        }
+    }
+}
+
+
+
+
+import org.junit.Test;
+
+import static org.junit.Assert.assertEquals;
+
+public class DealProductMergeTest {
+    @Test
+    public void testMergeDealProducts() {
+        // Scenario 1: Both have non-empty typeOfLoan
+        DealProduct dp1 = new DealProduct();
+        dp1.setTypeOfLoan("Loan1");
+
+        DealProduct dp2 = new DealProduct();
+        dp2.setTypeOfLoan("Loan2");
+
+        DealProductMerger merger = new DealProductMerger();
+        DealProduct merged1 = merger.mergeDealProducts(dp1, dp2);
+
+        assertEquals("Loan1", merged1.getTypeOfLoan());
+
+        // Scenario 2: One has non-empty typeOfLoan, the other is empty
+        dp1.setTypeOfLoan("Loan1");
+        dp2.setTypeOfLoan("");
+
+        DealProduct merged2 = merger.mergeDealProducts(dp1, dp2);
+
+        assertEquals("Loan1", merged2.getTypeOfLoan());
+
+        // Scenario 3: Both have empty typeOfLoan, one has non-empty uwStatus
+        dp1.setTypeOfLoan("");
+        dp2.setTypeOfLoan("");
+        dp1.setUwStatus("Status1");
+        dp2.setUwStatus("");
+
+        DealProduct merged3 = merger.mergeDealProducts(dp1, dp2);
+
+        assertEquals("Status1", merged3.getUwStatus());
+
+        // Scenario 4: Both have empty typeOfLoan, both have empty uwStatus, one has a date
+        dp1.setUwStatus("");
+        dp2.setUwStatus("");
+        dp1.setDate("2022-01-01");
+        dp2.setDate("");
+
+        DealProduct merged4 = merger.mergeDealProducts(dp1, dp2);
+
+        assertEquals("2022-01-01", merged4.getDate());
+
+        // Scenario 5: Both have empty typeOfLoan, both have empty uwStatus, both have a date
+        dp1.setDate("2022-01-01");
+        dp2.setDate("2023-02-02");
+
+        DealProduct merged5 = merger.mergeDealProducts(dp1, dp2);
+
+        assertEquals("2023-02-02", merged5.getDate());
+    }
+}
+
