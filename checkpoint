@@ -1,4 +1,4 @@
-To add the checkpointing feature to your existing consumer classes with minimal changes and make it plug-and-play, you can follow an approach where you create a separate `CheckpointManager` class that handles checkpointing and provides a callback mechanism. This way, your existing consumer classes can use the `CheckpointManager` without needing significant modifications.
+noTo add the checkpointing feature to your existing consumer classes with minimal changes and make it plug-and-play, you can follow an approach where you create a separate `CheckpointManager` class that handles checkpointing and provides a callback mechanism. This way, your existing consumer classes can use the `CheckpointManager` without needing significant modifications.
 
 Here's how you can structure your code:
 
@@ -379,4 +379,90 @@ private DealProduct mergeDealProducts(DealProduct dp1, DealProduct dp2, List<Fun
     }
     // If none of the attributes are non-empty, keep the one with the latest date
     return dp1.getDate().isAfter(dp2.getDate()) ? dp1 : dp2;
+}
+
+
+
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+import java.time.LocalDate;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Stream;
+
+import static org.mockito.Mockito.*;
+import static org.junit.jupiter.api.Assertions.*;
+
+@ExtendWith(MockitoExtension.class)
+public class YourTestClass {
+
+    @Mock
+    private DealProductRepository dealProductRepository;
+
+    private YourClassUnderTest yourClassUnderTest;
+
+    @BeforeEach
+    void setup() {
+        yourClassUnderTest = new YourClassUnderTest(dealProductRepository);
+    }
+
+    @Test
+    public void testLoadAllSyndicatedUnderwrittenDealProducts() {
+        // Sample DealProduct instances for testing
+        DealProduct dp1 = new DealProduct("1", "Type1", "Status1", LocalDate.of(2022, 1, 1));
+        DealProduct dp2 = new DealProduct("2", "Type2", "Status2", LocalDate.of(2022, 2, 2));
+        DealProduct dp3 = new DealProduct("3", "Type3", "Status3", LocalDate.of(2022, 3, 3));
+        DealProduct dp4 = new DealProduct("4", "Type4", "Status4", LocalDate.of(2022, 4, 4));
+        DealProduct dp5 = new DealProduct("5", "Type5", "Status5", LocalDate.of(2022, 5, 5));
+
+        // Mock the behavior of dealProductRepository
+        when(dealProductRepository.whereDirect()
+                .eq(eq(DealProduct.FUNDING_ARRANGEMENT), eq(SYNDICATED))
+                .eq(eq(DealProduct.DISTRIBUTION_METHOD), eq(UNDERWRITTEN))
+                .fetch().spliterator())
+                .thenReturn(Stream.of(dp1, dp2, dp3, dp4, dp5).spliterator());
+
+        Map<String, DealProduct> result = yourClassUnderTest.loadAllSyndicatedUnderwrittenDealProducts();
+
+        // Assertions
+        assertNotNull(result);
+        assertEquals(5, result.size());
+        assertTrue(result.containsKey("2"));
+        assertEquals(dp2, result.get("2"));
+        assertFalse(result.containsKey("1"));
+        assertTrue(result.containsKey("3"));
+        assertEquals(dp3, result.get("3"));
+        assertTrue(result.containsKey("4"));
+        assertEquals(dp4, result.get("4"));
+        assertTrue(result.containsKey("5"));
+        assertEquals(dp5, result.get("5"));
+    }
+
+    @Test
+    public void testMergeDealProducts() {
+        // Sample DealProduct instances for testing the merge function
+        DealProduct dp1 = new DealProduct("1", "Type1", "Status1", LocalDate.of(2022, 1, 1));
+        DealProduct dp2 = new DealProduct("2", "", "Status2", LocalDate.of(2022, 2, 2));
+
+        // List of attribute extractors for merge function
+        List<Function<DealProduct, String>> attributeExtractors = Arrays.asList(
+            DealProduct::getTypeOfLoan,
+            DealProduct::getUwStatus
+        );
+
+        DealProduct merged = yourClassUnderTest.mergeDealProducts(dp1, dp2, attributeExtractors);
+
+        // Assertions
+        assertNotNull(merged);
+        assertEquals(dp1.getDealId(), merged.getDealId());
+        assertEquals(dp1.getTypeOfLoan(), merged.getTypeOfLoan());
+        assertEquals(dp2.getUwStatus(), merged.getUwStatus());
+        assertEquals(dp1.getDate(), merged.getDate());
+    }
+
+    // Add more test cases as needed
 }
