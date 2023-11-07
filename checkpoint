@@ -466,3 +466,88 @@ public class YourTestClass {
 
     // Add more test cases as needed
 }
+
+
+
+import org.junit.Before;
+import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
+
+import java.time.LocalDate;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.function.Function;
+import java.util.List;
+
+import static org.junit.Assert.assertEquals;
+import static org.mockito.Mockito.*;
+import org.apache.commons.lang3.StringUtils;
+
+@RunWith(Parameterized.class)
+public class YourTestClass {
+
+    @Mock
+    private DealProductRepository dealProductRepository;
+
+    private YourClassUnderTest yourClassUnderTest;
+
+    @Parameterized.Parameters
+    public static Collection<Object[]> testCases() {
+        return Arrays.asList(new Object[][] {
+            // Add your test cases here in the form of arrays
+            { "Type1", "Status1", LocalDate.of(2022, 1, 1), "Type2", "Status2", LocalDate.of(2022, 2, 2), "Type1", "Status1", LocalDate.of(2022, 1, 1) },
+            { "Type1", "Status1", LocalDate.of(2022, 1, 1), "", "", null, "Type1", "Status1", LocalDate.of(2022, 1, 1) },
+            { "", "", null, "Type2", "Status2", LocalDate.of(2022, 2, 2), "Type2", "Status2", LocalDate.of(2022, 2, 2) },
+            { "", "", null, "", "", null, "", "", null }
+        });
+    }
+
+    private String type1;
+    private String uwStatus1;
+    private LocalDate date1;
+    private String type2;
+    private String uwStatus2;
+    private LocalDate date2;
+    private String expectedType;
+    private String expectedUwStatus;
+    private LocalDate expectedDate;
+
+    public YourTestClass(String type1, String uwStatus1, LocalDate date1, String type2, String uwStatus2, LocalDate date2,
+            String expectedType, String expectedUwStatus, LocalDate expectedDate) {
+        this.type1 = type1;
+        this.uwStatus1 = uwStatus1;
+        this.date1 = date1;
+        this.type2 = type2;
+        this.uwStatus2 = uwStatus2;
+        this.date2 = date2;
+        this.expectedType = expectedType;
+        this.expectedUwStatus = expectedUwStatus;
+        this.expectedDate = expectedDate;
+    }
+
+    @Before
+    public void setup() {
+        yourClassUnderTest = new YourClassUnderTest(dealProductRepository);
+    }
+
+    @Test
+    public void testMergeDealProducts() {
+        // Sample DealProduct instances for testing the merge function
+        DealProduct dp1 = new DealProduct("1", type1, uwStatus1, date1);
+        DealProduct dp2 = new DealProduct("2", type2, uwStatus2, date2);
+
+        // List of attribute extractors for merge function
+        List<Function<DealProduct, String>> attributeExtractors = Arrays.asList(
+            DealProduct::getTypeOfLoan,
+            DealProduct::getUwStatus
+        );
+
+        DealProduct merged = yourClassUnderTest.mergeDealProducts(dp1, dp2, attributeExtractors);
+
+        // Assertions
+        assertEquals(expectedType, merged.getTypeOfLoan());
+        assertEquals(expectedUwStatus, merged.getUwStatus());
+        assertEquals(expectedDate, merged.getDate());
+    }
+}
