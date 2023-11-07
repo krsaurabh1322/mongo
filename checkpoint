@@ -180,3 +180,159 @@ public class DealProductMergeTest {
     }
 }
 
+
+
+///////
+
+import java.util.*;
+import java.util.function.*;
+import java.util.stream.*;
+
+public Map<String, DealProduct> loadAllSyndicatedUnderwrittenDealProducts() {
+    List<Function<DealProduct, String>> attributeExtractors = Arrays.asList(
+        DealProduct::getTypeOfLoan,
+        DealProduct::getUwStatus,
+        // Add more attribute extractors for additional attributes
+        dp -> dp.getSomeOtherAttribute(),
+        dp -> dp.getYetAnotherAttribute()
+    );
+
+    return StreamSupport.stream(
+            dealProductRepository.whereDirect()
+                    .eq(DealProduct.FUNDING_ARRANGEMENT, SYNDICATED)
+                    .eq(DealProduct.DISTRIBUTION_METHOD, UNDERWRITTEN)
+                    .fetch()
+                    .spliterator(), false)
+            .collect(
+                    toMap(
+                            DealProduct::getDealId,
+                            identity(),
+                            (dp1, dp2) -> {
+                                // Custom merge function
+                                for (Function<DealProduct, String> extractor : attributeExtractors) {
+                                    String attr1 = extractor.apply(dp1);
+                                    String attr2 = extractor.apply(dp2);
+                                    if (!attr1.isEmpty() && !attr2.isEmpty()) {
+                                        // Both have non-empty attribute, proceed to the next
+                                        continue;
+                                    } else if (!attr1.isEmpty() || !attr2.isEmpty()) {
+                                        // Keep the one with non-empty attribute
+                                        return !attr1.isEmpty() ? dp1 : dp2;
+                                    }
+                                }
+                                // If none of the attributes is non-empty, keep the one with the latest date
+                                return dp1.getDate().isAfter(dp2.getDate()) ? dp1 : dp2;
+                            }
+                    )
+            );
+}
+
+
+
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+import java.time.LocalDate;
+import java.util.Map;
+import java.util.stream.Stream;
+import java.util.function.Function;
+
+import static org.mockito.Mockito.*;
+import static org.junit.jupiter.api.Assertions.*;
+
+@ExtendWith(MockitoExtension.class)
+public class YourTestClass {
+
+    @Mock
+    private DealProductRepository dealProductRepository;
+
+    private YourClassUnderTest yourClassUnderTest;
+
+    @BeforeEach
+    void setup() {
+        yourClassUnderTest = new YourClassUnderTest(dealProductRepository);
+    }
+
+    @Test
+    public void testLoadAllSyndicatedUnderwrittenDealProducts() {
+        // Sample DealProduct instances for testing
+        DealProduct dp1 = new DealProduct("1", "Type1", "Status1", LocalDate.of(2022, 1, 1));
+        DealProduct dp2 = new DealProduct("2", "Type2", "Status2", LocalDate.of(2022, 2, 2));
+        DealProduct dp3 = new DealProduct("3", "Type3", "Status3", LocalDate.of(2022, 3, 3));
+        DealProduct dp4 = new DealProduct("4", "Type4", "Status4", LocalDate.of(2022, 4, 4));
+        DealProduct dp5 = new DealProduct("5", "Type5", "Status5", LocalDate.of(2022, 5, 5));
+
+        // Mock the behavior of dealProductRepository
+        when(dealProductRepository.whereDirect()
+                .eq(eq(DealProduct.FUNDING_ARRANGEMENT), eq(SYNDICATED))
+                .eq(eq(DealProduct.DISTRIBUTION_METHOD), eq(UNDERWRITTEN))
+                .fetch().spliterator())
+                .thenReturn(Stream.of(dp1, dp2, dp3, dp4, dp5).spliterator());
+
+        Map<String, DealProduct> result = yourClassUnderTest.loadAllSyndicatedUnderwrittenDealProducts();
+
+        // Assertions
+        assertNotNull(result);
+        assertEquals(5, result.size());
+        assertTrue(result.containsKey("2"));
+        assertEquals(dp2, result.get("2"));
+        assertFalse(result.containsKey("1"));
+        assertTrue(result.containsKey("3"));
+        assertEquals(dp3, result.get("3"));
+        assertTrue(result.containsKey("4"));
+        assertEquals(dp4, result.get("4"));
+        assertTrue(result.containsKey("5"));
+        assertEquals(dp5, result.get("5"));
+    }
+
+    @Test
+    public void testLoadAllSyndicatedUnderwrittenDealProductsWithEmptyTypeOfLoan() {
+        // Sample DealProduct instances with empty typeOfLoan for testing
+        DealProduct dp1 = new DealProduct("1", "", "Status1", LocalDate.of(2022, 1, 1));
+        DealProduct dp2 = new DealProduct("2", "Type2", "", LocalDate.of(2022, 2, 2));
+
+        // Mock the behavior of dealProductRepository
+        when(dealProductRepository.whereDirect()
+                .eq(eq(DealProduct.FUNDING_ARRANGEMENT), eq(SYNDICATED))
+                .eq(eq(DealProduct.DISTRIBUTION_METHOD), eq(UNDERWRITTEN))
+                .fetch().spliterator())
+                .thenReturn(Stream.of(dp1, dp2).spliterator());
+
+        Map<String, DealProduct> result = yourClassUnderTest.loadAllSyndicatedUnderwrittenDealProducts();
+
+        // Assertions
+        assertNotNull(result);
+        assertEquals(2, result.size());
+        assertTrue(result.containsKey("2"));
+        assertEquals(dp2, result.get("2"));
+        assertFalse(result.containsKey("1"));
+    }
+
+    @Test
+    public void testLoadAllSyndicatedUnderwrittenDealProductsWithEmptyUwStatus() {
+        // Sample DealProduct instances with empty uwStatus for testing
+        DealProduct dp1 = new DealProduct("1", "Type1", "", LocalDate.of(2022, 1, 1));
+        DealProduct dp2 = new DealProduct("2", "Type2", "Status2", "", LocalDate.of(2022, 2, 2));
+
+        // Mock the behavior of dealProductRepository
+        when(dealProductRepository.whereDirect()
+                .eq(eq(DealProduct.FUNDING_ARRANGEMENT), eq(SYNDICATED))
+                .eq(eq(DealProduct.DISTRIBUTION_METHOD), eq(UNDERWRITTEN))
+                .fetch().spliterator())
+                .thenReturn(Stream.of(dp1, dp2).spliterator());
+
+        Map<String, DealProduct> result = yourClassUnderTest.loadAllSyndicatedUnderwrittenDealProducts();
+
+        // Assertions
+        assertNotNull(result);
+        assertEquals(2, result.size());
+        assertTrue(result.containsKey("2"));
+        assertEquals(dp2, result.get("2"));
+        assertFalse(result.containsKey("1"));
+    }
+
+    // Add more test cases for different scenarios as needed
+}
