@@ -7,3 +7,47 @@ During a critical period when the sole Hive developer took an extended leave, I 
 Emphasizing the importance of coding standards, I actively participated in code reviews and design calls, contributing to the overall enhancement of the CAT platform. Through a dual focus on individual contributions and effective managerial oversight, I successfully navigated challenges and bolstered the Loanshub team's performance and project outcomes.
 
 Delving deeper into the realm of Spark, I proactively identified and addressed hurdles in our Spark implementation, proposing design changes to optimize its functionality. My strategic vision extends to aligning Loanshub with a revamped Spark, geared towards facilitating on-the-fly computation and handling complex join operations more efficiently. This initiative reflects a commitment to enhancing the technical infrastructure and ensuring that Loanshub remains at the forefront of cutting-edge capabilities in the dynamic landscape of Spark technology.
+
+
+
+
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeFormatterBuilder;
+import java.time.format.ResolverStyle;
+import java.util.Locale;
+
+public class CustomDateTimeFormatter {
+
+    public static void main(String[] args) {
+        String input1 = "2023-11-06T12:34:56.789";
+        String input2 = "2023-11-06T12:34";
+        String input3 = "2023-11-06T12";
+
+        DateTimeFormatter formatter = createCustomFormatter();
+
+        LocalDateTime dateTime1 = LocalDateTime.parse(input1, formatter);
+        LocalDateTime dateTime2 = LocalDateTime.parse(input2, formatter);
+        LocalDateTime dateTime3 = LocalDateTime.parse(input3, formatter);
+
+        System.out.println(dateTime1);
+        System.out.println(dateTime2);
+        System.out.println(dateTime3);
+    }
+
+    private static DateTimeFormatter createCustomFormatter() {
+        return new DateTimeFormatterBuilder()
+                .appendPattern("yyyy-MM-dd'T'HH")
+                .optionalStart()
+                    .appendPattern(":mm")
+                .optionalEnd()
+                .optionalStart()
+                    .appendPattern(":ss")
+                .optionalEnd()
+                .optionalStart()
+                    .appendFraction(ChronoField.MILLI_OF_SECOND, 0, 3, true)
+                .optionalEnd()
+                .toFormatter(Locale.ENGLISH)
+                .withResolverStyle(ResolverStyle.STRICT);
+    }
+}
