@@ -1,0 +1,60 @@
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.Mockito.*;
+
+import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentMatchers;
+import java.net.PasswordAuthentication;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.util.HashMap;
+import java.util.Map;
+
+public class YourClassTest {
+
+    @Test
+    void testGetTokenFromOud_Successful() throws Exception {
+        // Mocking HttpClient
+        HttpClient mockedHttpClient = mock(HttpClient.class);
+        when(mockedHttpClient.send(any(HttpRequest.class), ArgumentMatchers.<HttpResponse.BodyHandler<String>>any()))
+                .thenReturn(HttpResponse.newBuilder()
+                        .statusCode(200)
+                        .body("{\"access_token\": \"your_token_value\"}")
+                        .build());
+
+        // Mocking System.currentTimeMillis() for elapsed time
+        System mockedSystem = mock(System.class);
+        when(mockedSystem.currentTimeMillis()).thenReturn(0L, 100L); // Assuming 100 ms elapsed time
+
+        YourClass yourClass = new YourClass(mockedHttpClient, mockedSystem);
+        
+        // Test
+        Either<String, FabricError> result = yourClass.getTokenFromOud("testUser", "testPassword", true);
+
+        // Assertions
+        assertEquals("your_token_value", result.getLeft());
+    }
+
+    @Test
+    void testGetTokenFromOud_Failure() throws Exception {
+        // Mocking HttpClient
+        HttpClient mockedHttpClient = mock(HttpClient.class);
+        when(mockedHttpClient.send(any(HttpRequest.class), ArgumentMatchers.<HttpResponse.BodyHandler<String>>any()))
+                .thenReturn(HttpResponse.newBuilder()
+                        .statusCode(500)
+                        .body("Error Message")
+                        .build());
+
+        // Mocking System.currentTimeMillis() for elapsed time
+        System mockedSystem = mock(System.class);
+        when(mockedSystem.currentTimeMillis()).thenReturn(0L, 100L); // Assuming 100 ms elapsed time
+
+        YourClass yourClass = new YourClass(mockedHttpClient, mockedSystem);
+
+        // Test
+        Either<String, FabricError> result = yourClass.getTokenFromOud("testUser", "testPassword", true);
+
+        // Assertions
+        assertEquals("HTTP Status Code : 500:Error Message", result.getRight().getMessage());
+    }
+}
