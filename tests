@@ -1,4 +1,4 @@
-import static org.junit.jupiter.api.Assertions.assertEquals;
+deimport static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.*;
 
 import org.junit.jupiter.api.Test;
@@ -129,4 +129,74 @@ class DALHandlerTest {
         verify(dalHandler.getLogger(), times(1)).error(anyString(), eq(throwable.getMessage()));
         verify(completedLatch, times(1)).countDown();
     }
+}
+
+
+import com.scb.cat.common.config.Config;
+import com.scb.cat.common.logging.LoggerFactory;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.mockito.Mock;
+import org.mockito.MockitoAnnotations;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.*;
+
+public class GrpcClientTest {
+
+    @Mock
+    private LoggerFactory loggerFactory;
+
+    @Mock
+    private Config config;
+
+    @Mock
+    private DALClient dalClient;
+
+    @Mock
+    private DALHandler dalHandler;
+
+    private GrpcClient grpcClient;
+
+    @BeforeEach
+    void setUp() {
+        MockitoAnnotations.openMocks(this);
+        grpcClient = new GrpcClient(loggerFactory, config);
+    }
+
+    @Test
+    void testProcessQuery_Success() throws Exception {
+        when(config.get(any())).thenReturn("dummyValue");
+        when(dalClient.queryDomainJsonPathFilter(any(), any(), anyBoolean(), any(), any())).thenReturn("dummyResponse");
+        when(loggerFactory.create(GrpcClient.class)).thenReturn(mock(Logger.class));
+
+        grpcClient.processQuery(QueryType.CLIMATERISK, new HashMap<>());
+
+        // You might need additional verification based on your actual implementation
+        verify(loggerFactory, times(1)).create(GrpcClient.class);
+        verify(dalClient, times(1)).queryDomainJsonPathFilter(any(), any(), anyBoolean(), any(), any());
+        verify(dalHandler, times(1)).getCompletedLatch();
+    }
+
+    @Test
+    void testProcessQuery_Exception() throws Exception {
+        when(config.get(any())).thenReturn("dummyValue");
+        when(dalClient.queryDomainJsonPathFilter(any(), any(), anyBoolean(), any(), any())).thenThrow(new RuntimeException("Test Exception"));
+        when(loggerFactory.create(GrpcClient.class)).thenReturn(mock(Logger.class));
+
+        List<String> result = grpcClient.processQuery(QueryType.CLIMATERISK, new HashMap<>());
+
+        assertEquals(0, result.size()); // Ensure that no responses are added in case of an exception
+        verify(loggerFactory, times(1)).create(GrpcClient.class);
+        verify(dalClient, times(1)).queryDomainJsonPathFilter(any(), any(), anyBoolean(), any(), any());
+        verify(dalHandler, times(0)).getCompletedLatch(); // Verify that the latch is not awaited in case of an exception
+    }
+
+    // Add more tests based on your specific use cases and edge scenarios
 }
