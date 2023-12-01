@@ -200,3 +200,72 @@ public class GrpcClientTest {
 
     // Add more tests based on your specific use cases and edge scenarios
 }
+
+
+///
+
+
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.*;
+
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.mockito.Mock;
+import org.mockito.MockitoAnnotations;
+import org.slf4j.Logger;
+
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+
+public class GrpcClientTest {
+
+    @Mock
+    private LoggerFactory loggerFactory;
+
+    @Mock
+    private Logger logger;
+
+    private GrpcClient grpcClient;
+
+    @BeforeEach
+    void setUp() {
+        MockitoAnnotations.openMocks(this);
+        grpcClient = new GrpcClient(loggerFactory, config);
+    }
+
+    @Test
+    void testWaitQuietlyForCompletionLatch_Successful() {
+        CountDownLatch countDownLatch = new CountDownLatch(1);
+
+        when(loggerFactory.create(any())).thenReturn(logger);
+
+        // Run waitQuietlyForCompletionLatch in a separate thread
+        new Thread(() -> grpcClient.waitQuietlyForCompletionLatch(5, countDownLatch)).start();
+
+        // CountDownLatch is decremented in a separate thread, so we wait a bit for the latch to be counted down
+        try {
+            Thread.sleep(1000);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+
+        // CountDownLatch is counted down, so the logger should be called with the success message
+        verify(logger, times(1)).info(eq("Client has successfully retrieved all the data from server within the time, "
+                + "maximum time allowed for each data query is {}s "), eq(5L));
+    }
+
+    @Test
+    void testWaitQuietlyForCompletionLatch_Timeout() {
+        CountDownLatch countDownLatch = new CountDownLatch(0);
+
+        when(loggerFactory.create(any())).thenReturn(logger);
+
+        // Run waitQuietlyForCompletionLatch with a CountDownLatch that will not be counted down
+        grpcClient.waitQuietlyForCompletionLatch(1, countDownLatch);
+
+        // The logger should be called with the timeout warning message
+        verify(logger, times(1)).warn(eq("Client has not finished the data query in allowed time, "
+                + "maximum time allowed for each data query is {}s "), eq(1L));
+    }
+}
+
