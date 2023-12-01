@@ -58,3 +58,75 @@ public class YourClassTest {
         assertEquals("HTTP Status Code : 500:Error Message", result.getRight().getMessage());
     }
 }
+
+
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.Mockito.*;
+
+import com.scb.bpsi.grpc.clients.async.BiDiAsyncResponseHandler;
+import com.scb.bpsi.v2.proto.query.QueryResponse;
+import com.scb.cat.common.logging.LoggerFactory;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import java.nio.charset.StandardCharsets;
+import java.util.Collections;
+import java.util.concurrent.CountDownLatch;
+
+class DALHandlerTest {
+
+    private DALHandler dalHandler;
+    private CountDownLatch completedLatch;
+    private CallBackHandler<String> callBackHandler;
+
+    @BeforeEach
+    void setUp() {
+        LoggerFactory loggerFactory = mock(LoggerFactory.class);
+        completedLatch = mock(CountDownLatch.class);
+        callBackHandler = mock(CallBackHandler.class);
+        dalHandler = new DALHandler(loggerFactory, completedLatch, callBackHandler);
+    }
+
+    @Test
+    void onNext_SuccessfulResponse() {
+        QueryResponse queryResponse = QueryResponse.newBuilder()
+                .setSuccess(true)
+                .addData(QueryResponse.Data.newBuilder().setDetail(QueryResponse.Detail.newBuilder().setData("test data")))
+                .build();
+
+        dalHandler.onNext(queryResponse);
+
+        assertEquals(Collections.singletonList("test data"), dalHandler.getResponseList());
+    }
+
+    @Test
+    void onNext_UnsuccessfulResponse() {
+        QueryResponse queryResponse = QueryResponse.newBuilder().setSuccess(false).build();
+
+        dalHandler.onNext(queryResponse);
+
+        // Assert that the responseList remains empty for unsuccessful responses
+        assertEquals(Collections.emptyList(), dalHandler.getResponseList());
+    }
+
+    @Test
+    void onCompleted() {
+        dalHandler.onCompleted();
+
+        // Verify that the logger and completedLatch are called appropriately
+        verify(dalHandler.getLogger(), times(1)).info(anyString(), anyInt());
+        verify(completedLatch, times(1)).countDown();
+        verify(callBackHandler, times(1)).fillData(anyList());
+    }
+
+    @Test
+    void onError() {
+        Throwable throwable = new RuntimeException("Test error");
+
+        dalHandler.onError(throwable);
+
+        // Verify that the logger and completedLatch are called appropriately
+        verify(dalHandler.getLogger(), times(1)).error(anyString(), eq(throwable.getMessage()));
+        verify(completedLatch, times(1)).countDown();
+    }
+}
